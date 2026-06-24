@@ -1,5 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { deleteJSON, getJSON, postFormData, postJSON, putJSON } from "../api/client";
+import { useEffect, useMemo, useState } from "react";
+import { deleteJSON, getJSON, postJSON, putJSON } from "../api/client";
 
 type AppConfig = {
   timezone: string;
@@ -13,22 +13,6 @@ type AppConfig = {
 type LabelsResponse = {
   configured: string[];
   imap: string[];
-};
-
-type LlamaAuthStatus = {
-  exists: boolean;
-  path: string;
-  size?: number;
-  modifiedAt?: string;
-  localEnabled: boolean;
-};
-
-type LlamaAuthUploadResponse = {
-  ok: boolean;
-  path: string;
-  filename: string;
-  restartOk?: boolean;
-  restartError?: string;
 };
 
 type IMAPConfigStatus = {
@@ -104,11 +88,6 @@ export function ConfigPage() {
   const [imapMessage, setImapMessage] = useState("");
   const [imapBusy, setImapBusy] = useState(false);
 
-  const [llamaAuthStatus, setLlamaAuthStatus] = useState<LlamaAuthStatus | null>(null);
-  const [llamaAuthFile, setLlamaAuthFile] = useState<File | null>(null);
-  const [llamaAuthMessage, setLlamaAuthMessage] = useState("");
-  const [llamaAuthBusy, setLlamaAuthBusy] = useState(false);
-
   const [llamaTestBusy, setLlamaTestBusy] = useState(false);
   const [llamaTestResult, setLlamaTestResult] = useState("");
 
@@ -136,11 +115,6 @@ export function ConfigPage() {
     }
   }
 
-  async function refreshLlamaAuthStatus() {
-    const status = await getJSON<LlamaAuthStatus>("/api/llama/auth");
-    setLlamaAuthStatus(status);
-  }
-
   useEffect(() => {
     let cancelled = false;
 
@@ -163,8 +137,7 @@ export function ConfigPage() {
       // Load secondary panels independently so one failure does not block the entire page.
       await Promise.all([
         refreshLabels().catch(() => undefined),
-        refreshIMAPStatus().catch(() => undefined),
-        refreshLlamaAuthStatus().catch(() => undefined)
+        refreshIMAPStatus().catch(() => undefined)
       ]);
     };
 
@@ -261,32 +234,6 @@ export function ConfigPage() {
     }
   }
 
-  async function uploadLlamaAuth() {
-    if (!llamaAuthFile) {
-      setLlamaAuthMessage("Select a JSON auth file first.");
-      return;
-    }
-    setLlamaAuthBusy(true);
-    setLlamaAuthMessage("");
-    try {
-      const form = new FormData();
-      form.append("authFile", llamaAuthFile);
-      const result = await postFormData<LlamaAuthUploadResponse>("/api/llama/auth", form);
-      if (result.restartOk === false) {
-        setLlamaAuthMessage(`Auth saved, but Llama restart needs attention: ${result.restartError ?? "unknown error"}`);
-      } else {
-        setLlamaAuthMessage("Llama auth uploaded and runtime reloaded.");
-      }
-      setLlamaAuthFile(null);
-      await refreshLlamaAuthStatus();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "unknown error";
-      setLlamaAuthMessage(`Failed to upload Llama auth: ${message}`);
-    } finally {
-      setLlamaAuthBusy(false);
-    }
-  }
-
   async function runLlamaTest() {
     setLlamaTestBusy(true);
     setLlamaTestResult("");
@@ -312,10 +259,6 @@ export function ConfigPage() {
 
   function updateConfig<K extends keyof AppConfig>(key: K, value: AppConfig[K]) {
     setCfg((prev) => (prev ? { ...prev, [key]: value } : prev));
-  }
-
-  function onLlamaAuthFileChange(event: ChangeEvent<HTMLInputElement>) {
-    setLlamaAuthFile(event.target.files?.[0] ?? null);
   }
 
   return (
@@ -379,24 +322,6 @@ export function ConfigPage() {
           onChange={(event) => updateConfig("llama", { ...cfg.llama, classifyPath: event.target.value })}
         />
       </label>
-
-      <h4>Llama Auth Upload</h4>
-      <label>
-        <div>Auth File (JSON)</div>
-        <input type="file" accept="application/json,.json" onChange={onLlamaAuthFileChange} />
-      </label>
-      <button type="button" onClick={uploadLlamaAuth} disabled={llamaAuthBusy}>
-        {llamaAuthBusy ? "Uploading..." : "Upload Llama Auth"}
-      </button>
-      {llamaAuthStatus ? (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 6, padding: 10, marginTop: 10 }}>
-          <p>Configured: {llamaAuthStatus.exists ? "Yes" : "No"}</p>
-          <p>Path: {llamaAuthStatus.path}</p>
-          {llamaAuthStatus.modifiedAt ? <p>Updated: {llamaAuthStatus.modifiedAt}</p> : null}
-          <p>Local Enabled: {llamaAuthStatus.localEnabled ? "Yes" : "No"}</p>
-        </div>
-      ) : null}
-      {llamaAuthMessage ? <p>{llamaAuthMessage}</p> : null}
 
       <button type="button" onClick={runLlamaTest} disabled={llamaTestBusy}>
         {llamaTestBusy ? "Testing..." : "Run Llama Test"}
