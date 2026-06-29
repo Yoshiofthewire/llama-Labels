@@ -10,7 +10,7 @@ All code under `frontend/`. Produces a static bundle under `frontend/dist/` cons
 
 ## Local Contracts
 
-- React 18.3, React Router 6.30, TypeScript, Vite
+- React 18.3, React Router 6.30, TypeScript, Vite, Quill (WYSIWYG compose editor)
 - All HTTP calls go through `src/api/client.ts` (`getJSON`, `postJSON`, `putJSON`, `deleteJSON`, `postFormData`) — never use `fetch` directly in page components
 - Auth state is owned by `App.tsx`; pages read it via props, not via direct `/api/auth/me` calls
 - All pages live under `src/pages/`; routing is defined in `App.tsx`

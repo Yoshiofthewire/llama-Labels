@@ -404,8 +404,38 @@ pre {
 }
 
 .compose-editor-html {
-  overflow-y: auto;
-  white-space: pre-wrap;
+  overflow: hidden;
+  padding: 0;
+  background: #fff;
+  color: #202124;
+}
+
+.compose-editor-html .ql-toolbar.ql-snow {
+  border: 0;
+  border-bottom: 1px solid #d8dde6;
+  border-radius: 10px 10px 0 0;
+}
+
+.compose-editor-html .ql-container.ql-snow {
+  border: 0;
+  min-height: min(360px, 46vh);
+  font-family: var(--sans);
+  font-size: 0.95rem;
+}
+
+.compose-editor-html .ql-editor {
+  min-height: min(360px, 46vh);
+}
+
+.compose-editor-html .ql-toolbar button,
+.compose-editor-html .ql-toolbar button:hover,
+.compose-editor-html .ql-toolbar button:focus {
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 3px 5px;
+  border-radius: 0;
 }
 
 @media (max-width: 900px) {

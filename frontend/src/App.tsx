@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
+import Quill from "quill";
+import "quill/dist/quill.snow.css";
 import { getJSON, postJSON } from "./api/client";
 import { ConfigPage } from "./pages/ConfigPage";
 import { DecisionsPage } from "./pages/DecisionsPage";
@@ -38,7 +40,7 @@ type InboxFoldersResponse = {
   folders: string[];
 };
 
-type ComposeMode = "text" | "html" | "markup";
+type ComposeMode = "text" | "html";
 
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
@@ -54,11 +56,11 @@ export function App() {
   const [composeMode, setComposeMode] = useState<ComposeMode>("text");
   const [composeTextBody, setComposeTextBody] = useState("");
   const [composeHtmlBody, setComposeHtmlBody] = useState("");
-  const [composeMarkupBody, setComposeMarkupBody] = useState("");
   const [composeSending, setComposeSending] = useState(false);
   const [composeError, setComposeError] = useState("");
   const [composeSuccess, setComposeSuccess] = useState("");
-  const htmlEditorRef = useRef<HTMLDivElement | null>(null);
+  const quillEditorRef = useRef<HTMLDivElement | null>(null);
+  const quillInstanceRef = useRef<Quill | null>(null);
 
   async function refreshAuth() {
     try {
@@ -104,9 +106,23 @@ export function App() {
 
   useEffect(() => {
     if (!composeOpen || composeMode !== "html") return;
-    if (!htmlEditorRef.current) return;
-    htmlEditorRef.current.innerHTML = composeHtmlBody;
-  }, [composeOpen, composeMode]);
+    if (!quillEditorRef.current) return;
+
+    if (!quillInstanceRef.current) {
+      const quill = new Quill(quillEditorRef.current, {
+        theme: "snow"
+      });
+      quill.on("text-change", () => {
+        setComposeHtmlBody(quill.root.innerHTML);
+      });
+      quillInstanceRef.current = quill;
+    }
+
+    const editor = quillInstanceRef.current;
+    if (editor && editor.root.innerHTML !== composeHtmlBody) {
+      editor.root.innerHTML = composeHtmlBody;
+    }
+  }, [composeOpen, composeMode, composeHtmlBody]);
 
   function resetComposeForm() {
     setComposeTo("");
@@ -116,10 +132,12 @@ export function App() {
     setComposeMode("text");
     setComposeTextBody("");
     setComposeHtmlBody("");
-    setComposeMarkupBody("");
     setComposeSending(false);
     setComposeError("");
     setComposeSuccess("");
+    if (quillInstanceRef.current) {
+      quillInstanceRef.current.setText("");
+    }
   }
 
   function openComposeWindow() {
@@ -130,18 +148,15 @@ export function App() {
 
   function getComposeBody(mode: ComposeMode): string {
     if (mode === "html") {
-      return htmlEditorRef.current?.innerHTML ?? composeHtmlBody;
-    }
-    if (mode === "markup") {
-      return composeMarkupBody;
+      return quillInstanceRef.current?.root.innerHTML ?? composeHtmlBody;
     }
     return composeTextBody;
   }
 
   function switchComposeMode(nextMode: ComposeMode) {
     if (nextMode === composeMode) return;
-    if (composeMode === "html" && htmlEditorRef.current) {
-      setComposeHtmlBody(htmlEditorRef.current.innerHTML);
+    if (composeMode === "html" && quillInstanceRef.current) {
+      setComposeHtmlBody(quillInstanceRef.current.root.innerHTML);
     }
     setComposeMode(nextMode);
   }
@@ -204,12 +219,12 @@ export function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <button type="button" className="new-email-button" onClick={openComposeWindow}>
-          New Email
-        </button>
         <div className="sidebar-logo">
           <img src="/llamalabel.png" alt="Llama Labels" style={{ width: "100%", maxWidth: 180, display: "block", margin: "0 auto 0.75rem" }} />
         </div>
+        <button type="button" className="new-email-button" onClick={openComposeWindow}>
+          New Email
+        </button>
         <nav>
           {primaryNavItems.map(([to, label]) => (
             <Link key={to} to={to}>
@@ -338,13 +353,6 @@ export function App() {
               >
                 WYSIWYG HTML
               </button>
-              <button
-                type="button"
-                className={`compose-mode-button ${composeMode === "markup" ? "active" : ""}`}
-                onClick={() => switchComposeMode("markup")}
-              >
-                Markup
-              </button>
             </div>
 
             {composeMode === "text" ? (
@@ -358,20 +366,13 @@ export function App() {
 
             {composeMode === "html" ? (
               <div
-                ref={htmlEditorRef}
+                ref={quillEditorRef}
                 className="compose-editor compose-editor-html"
-                contentEditable
-                suppressContentEditableWarning
-                onInput={(event) => setComposeHtmlBody((event.currentTarget as HTMLDivElement).innerHTML)}
-              />
-            ) : null}
-
-            {composeMode === "markup" ? (
-              <textarea
-                className="compose-editor"
-                value={composeMarkupBody}
-                onChange={(event) => setComposeMarkupBody(event.target.value)}
-                placeholder="Write your email in Markdown or other markup"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                  }
+                }}
               />
             ) : null}
           </section>
