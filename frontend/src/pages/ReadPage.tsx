@@ -230,6 +230,7 @@ export function ReadPage() {
               <div>
                 {showRawEmail ? (
                   <pre
+                    key="raw"
                     style={{
                       margin: 0,
                       maxHeight: "40vh",
@@ -244,53 +245,54 @@ export function ReadPage() {
                       fontFamily: "var(--mono)"
                     }}
                   >
-                    {selected.body && selected.body.trim() !== "" ? selected.body : "No message body available."}
+                    {selected.body || "No message body available."}
                   </pre>
-                ) : (
-                  (() => {
-                    const body = selected.body && selected.body.trim() !== "" ? selected.body : "No message body available.";
-                    const isHtml = /<[^>]+>/.test(body);
-                    
-                    if (isHtml) {
-                      return (
-                        <div
-                          style={{
-                            margin: 0,
-                            maxHeight: "40vh",
-                            overflowY: "auto",
-                            border: "1px solid var(--line)",
-                            borderRadius: 8,
-                            padding: "10px 12px",
-                            background: "var(--bg)",
-                            color: "var(--ink-strong)",
-                            wordBreak: "break-word"
-                          }}
-                          dangerouslySetInnerHTML={{ __html: processEmailHtml(body, showImages) }}
-                        />
-                      );
-                    } else {
-                      return (
-                        <pre
-                          style={{
-                            margin: 0,
-                            maxHeight: "40vh",
-                            overflowY: "auto",
-                            border: "1px solid var(--line)",
-                            borderRadius: 8,
-                            padding: "10px 12px",
-                            background: "var(--bg)",
-                            color: "var(--ink-strong)",
-                            whiteSpace: "pre-wrap",
-                            wordBreak: "break-word",
-                            fontFamily: "var(--mono)"
-                          }}
-                        >
-                          {body}
-                        </pre>
-                      );
-                    }
-                  })()
-                )}
+                ) : null}
+                {!showRawEmail ? (() => {
+                  const body = selected.body || "No message body available.";
+                  const isHtml = /<[^>]+>/.test(body);
+                  
+                  if (isHtml) {
+                    return (
+                      <div
+                        key="html"
+                        style={{
+                          margin: 0,
+                          maxHeight: "40vh",
+                          overflowY: "auto",
+                          border: "1px solid var(--line)",
+                          borderRadius: 8,
+                          padding: "10px 12px",
+                          background: "var(--bg)",
+                          color: "var(--ink-strong)",
+                          wordBreak: "break-word"
+                        }}
+                        dangerouslySetInnerHTML={{ __html: processEmailHtml(body, showImages) }}
+                      />
+                    );
+                  } else {
+                    return (
+                      <pre
+                        key="text"
+                        style={{
+                          margin: 0,
+                          maxHeight: "40vh",
+                          overflowY: "auto",
+                          border: "1px solid var(--line)",
+                          borderRadius: 8,
+                          padding: "10px 12px",
+                          background: "var(--bg)",
+                          color: "var(--ink-strong)",
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          fontFamily: "var(--mono)"
+                        }}
+                      >
+                        {body}
+                      </pre>
+                    );
+                  }
+                })() : null}
                 <div style={{ marginTop: 8, display: "flex", gap: 12, fontSize: "0.75rem", opacity: 0.7 }}>
                   {!showRawEmail && (
                     <p style={{ margin: 0 }}>Remote images are not loaded by default.</p>
