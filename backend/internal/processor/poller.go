@@ -145,6 +145,7 @@ func (p *Poller) tick() {
 			_ = p.store.AddDecision(state.Decision{
 				MessageID: msg.ID,
 				Sender:    msg.Sender,
+				SentTo:    msg.SentTo,
 				Subject:   msg.Subject,
 				Status:    "failed",
 				Detail:    err.Error(),
@@ -240,6 +241,7 @@ func (p *Poller) handleMessage(ctx context.Context, msg imapadapter.Message) err
 		_ = p.store.AddDecision(state.Decision{
 			MessageID: msg.ID,
 			Sender:    msg.Sender,
+			SentTo:    msg.SentTo,
 			Subject:   msg.Subject,
 			Status:    "skipped",
 			Detail:    "no known label returned",
@@ -266,6 +268,7 @@ func (p *Poller) handleMessage(ctx context.Context, msg imapadapter.Message) err
 	return p.store.AddDecision(state.Decision{
 		MessageID: msg.ID,
 		Sender:    msg.Sender,
+		SentTo:    msg.SentTo,
 		Subject:   msg.Subject,
 		Label:     selected,
 		Status:    "applied",

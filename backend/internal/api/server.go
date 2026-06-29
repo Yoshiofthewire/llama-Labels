@@ -76,6 +76,7 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/api/config", s.withAuth(s.handleConfig))
 	mux.HandleFunc("/api/labels", s.withAuth(s.handleLabels))
 	mux.HandleFunc("/api/decisions", s.withAuth(s.handleDecisions))
+	mux.HandleFunc("/api/inbox", s.withAuth(s.handleInbox))
 	mux.HandleFunc("/api/logs", s.withAuth(s.handleLogs))
 	mux.HandleFunc("/api/logs/list", s.withAuth(s.handleLogsList))
 	mux.HandleFunc("/api/llama/auth", s.withAuth(s.handleLlamaAuth))
@@ -447,6 +448,146 @@ func (s *Server) handleDecisions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, s.store.Decisions(limit))
+}
+
+type inboxEmail struct {
+	MessageID string `json:"messageId"`
+	Sender    string `json:"sender"`
+	SentTo    string `json:"sentTo,omitempty"`
+	Subject   string `json:"subject"`
+	Label     string `json:"label,omitempty"`
+	Status    string `json:"status"`
+	Detail    string `json:"detail,omitempty"`
+	AtUTC     string `json:"atUtc"`
+}
+
+func firstMatchingKeyword(keywords []string, allowed []string) string {
+	if len(keywords) == 0 || len(allowed) == 0 {
+		return ""
+	}
+	seen := map[string]string{}
+	for _, keyword := range keywords {
+		clean := strings.TrimSpace(keyword)
+		if clean == "" {
+			continue
+		}
+		seen[strings.ToLower(clean)] = clean
+	}
+	for _, allowedKeyword := range allowed {
+		key := strings.ToLower(strings.TrimSpace(allowedKeyword))
+		if key == "" {
+			continue
+		}
+		if matched, ok := seen[key]; ok {
+			return matched
+		}
+	}
+	return ""
+}
+
+func collectAllowedKeywords(cfg config.Config) []string {
+	out := []string{}
+	seen := map[string]bool{}
+	appendKeyword := func(value string) {
+		clean := strings.TrimSpace(value)
+		if clean == "" {
+			return
+		}
+		key := strings.ToLower(clean)
+		if seen[key] {
+			return
+		}
+		seen[key] = true
+		out = append(out, clean)
+	}
+
+	for _, label := range cfg.Labels.Allowlist {
+		appendKeyword(label)
+	}
+	for _, mappedKeywords := range cfg.Labels.KeywordMappings {
+		for _, keyword := range mappedKeywords {
+			appendKeyword(keyword)
+		}
+	}
+	return out
+}
+
+func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	limit := 500
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 5000 {
+			limit = v
+		}
+	}
+
+	s.mu.RLock()
+	cfg := s.cfg
+	s.mu.RUnlock()
+	allowedKeywords := collectAllowedKeywords(cfg)
+
+	tabs := make([]string, 0, len(allowedKeywords)+1)
+	byTab := map[string][]inboxEmail{}
+	seenTab := map[string]bool{}
+
+	for _, keyword := range allowedKeywords {
+		name := strings.TrimSpace(keyword)
+		if name == "" {
+			continue
+		}
+		if seenTab[strings.ToLower(name)] {
+			continue
+		}
+		seenTab[strings.ToLower(name)] = true
+		tabs = append(tabs, name)
+		byTab[name] = []inboxEmail{}
+	}
+
+	const uncategorizedTab = "Uncategorized"
+	byTab[uncategorizedTab] = []inboxEmail{}
+
+	if s.mail == nil {
+		tabs = append(tabs, uncategorizedTab)
+		writeJSON(w, http.StatusOK, map[string]any{"tabs": tabs, "byTab": byTab})
+		return
+	}
+
+	unread, err := s.mail.ListUnreadMessages(r.Context(), limit)
+	if err != nil {
+		http.Error(w, "failed to fetch unread inbox", http.StatusBadGateway)
+		return
+	}
+
+	for _, msg := range unread {
+		tab := firstMatchingKeyword(msg.Keywords, allowedKeywords)
+		if tab == "" {
+			tab = uncategorizedTab
+		}
+
+		if _, ok := byTab[tab]; !ok {
+			byTab[tab] = []inboxEmail{}
+			if tab != uncategorizedTab {
+				tabs = append(tabs, tab)
+			}
+		}
+
+		byTab[tab] = append(byTab[tab], inboxEmail{
+			MessageID: msg.MessageID,
+			Sender:    msg.Sender,
+			SentTo:    msg.SentTo,
+			Subject:   msg.Subject,
+			Label:     tab,
+			Status:    "unread",
+			AtUTC:     msg.AtUTC,
+		})
+	}
+
+	tabs = append(tabs, uncategorizedTab)
+	writeJSON(w, http.StatusOK, map[string]any{"tabs": tabs, "byTab": byTab})
 }
 
 func (s *Server) handleLabels(w http.ResponseWriter, r *http.Request) {

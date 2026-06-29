@@ -22,11 +22,22 @@ type Message struct {
 	ID      string
 	Subject string
 	Sender  string
+	SentTo  string
 	Body    string
+}
+
+type UnreadMessage struct {
+	MessageID string
+	Subject   string
+	Sender    string
+	SentTo    string
+	Keywords  []string
+	AtUTC     string
 }
 
 type Client interface {
 	ListUnreadInbox(ctx context.Context, sinceCheckpoint string) ([]Message, string, error)
+	ListUnreadMessages(ctx context.Context, limit int) ([]UnreadMessage, error)
 	ListLabels(ctx context.Context) ([]string, error)
 	EnsureLabel(ctx context.Context, label string) error
 	ApplyLabel(ctx context.Context, messageID, label string) error
@@ -36,6 +47,10 @@ type StubClient struct{}
 
 func (s *StubClient) ListUnreadInbox(_ context.Context, _ string) ([]Message, string, error) {
 	return []Message{}, "", nil
+}
+
+func (s *StubClient) ListUnreadMessages(_ context.Context, _ int) ([]UnreadMessage, error) {
+	return []UnreadMessage{}, nil
 }
 
 func (s *StubClient) ListLabels(_ context.Context) ([]string, error) {
@@ -259,6 +274,7 @@ func (c *APIClient) ListUnreadInbox(ctx context.Context, sinceCheckpoint string)
 			ID:      strconv.Itoa(uid),
 			Subject: strings.TrimSpace(e.Subject),
 			Sender:  strings.TrimSpace(e.From.String()),
+			SentTo:  strings.TrimSpace(e.To.String()),
 			Body:    body,
 		})
 		if uid > maxUID {
@@ -271,6 +287,92 @@ func (c *APIClient) ListUnreadInbox(ctx context.Context, sinceCheckpoint string)
 		next = strconv.Itoa(maxUID)
 	}
 	return out, next, nil
+}
+
+func (c *APIClient) ListUnreadMessages(ctx context.Context, limit int) ([]UnreadMessage, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 500
+	}
+
+	d, err := c.ensureConnectedLocked()
+	if err != nil {
+		return nil, err
+	}
+
+	uids, err := d.GetUIDs("UNSEEN")
+	if err != nil {
+		return nil, fmt.Errorf("imap search unseen: %w", err)
+	}
+	if len(uids) == 0 {
+		return []UnreadMessage{}, nil
+	}
+
+	sort.Ints(uids)
+	if len(uids) > limit {
+		uids = uids[len(uids)-limit:]
+	}
+
+	emails, err := d.GetEmails(uids...)
+	if err != nil {
+		return nil, fmt.Errorf("imap fetch emails: %w", err)
+	}
+
+	overviews, err := d.GetOverviews(uids...)
+	if err != nil {
+		return nil, fmt.Errorf("imap fetch overviews: %w", err)
+	}
+
+	out := make([]UnreadMessage, 0, len(uids))
+	for i := len(uids) - 1; i >= 0; i-- {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		uid := uids[i]
+		e := emails[uid]
+		if e == nil {
+			continue
+		}
+
+		keywords := []string{}
+		if ov := overviews[uid]; ov != nil {
+			seen := map[string]bool{}
+			for _, flag := range ov.Flags {
+				clean := strings.TrimSpace(flag)
+				if clean == "" || strings.HasPrefix(clean, "\\") {
+					continue
+				}
+				key := strings.ToLower(clean)
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				keywords = append(keywords, clean)
+			}
+		}
+
+		ts := e.Sent
+		if ts.IsZero() {
+			ts = e.Received
+		}
+		atUTC := ""
+		if !ts.IsZero() {
+			atUTC = ts.UTC().Format(time.RFC3339)
+		}
+
+		out = append(out, UnreadMessage{
+			MessageID: strconv.Itoa(uid),
+			Subject:   strings.TrimSpace(e.Subject),
+			Sender:    strings.TrimSpace(e.From.String()),
+			SentTo:    strings.TrimSpace(e.To.String()),
+			Keywords:  keywords,
+			AtUTC:     atUTC,
+		})
+	}
+
+	return out, nil
 }
 
 func (c *APIClient) ListLabels(ctx context.Context) ([]string, error) {

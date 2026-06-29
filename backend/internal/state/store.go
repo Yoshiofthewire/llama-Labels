@@ -26,6 +26,7 @@ type Store struct {
 type Decision struct {
 	MessageID string `json:"messageId"`
 	Sender    string `json:"sender"`
+	SentTo    string `json:"sentTo,omitempty"`
 	Subject   string `json:"subject"`
 	Label     string `json:"label"`
 	Status    string `json:"status"`

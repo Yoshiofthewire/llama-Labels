@@ -6,12 +6,16 @@ import { DecisionsPage } from "./pages/DecisionsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LogsPage } from "./pages/LogsPage";
 import { LabelsPage } from "./pages/LabelsPage";
+import { ReadPage } from "./pages/ReadPage";
 import { StatusPage } from "./pages/StatusPage";
 import { TuningPage } from "./pages/TuningPage";
 
-const navItems = [
+const primaryNavItems = [
+  ["/read", "Read"],
+  ["/status", "Status"]
+] as const;
+const settingsNavItems = [
   ["/login", "Login"],
-  ["/status", "Status"],
   ["/config", "Config"],
   ["/tuning", "Tuning"],
   ["/logs", "Logs"]
@@ -25,6 +29,7 @@ type AuthState = {
 
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function refreshAuth() {
     try {
@@ -82,11 +87,30 @@ export function App() {
           </div>
         ) : null}
         <nav>
-          {navItems.map(([to, label]) => (
+          {primaryNavItems.map(([to, label]) => (
             <Link key={to} to={to}>
-              {to === "/login" && auth.authenticated ? "Change Password" : label}
+              {label}
             </Link>
           ))}
+
+          <button
+            type="button"
+            className="nav-heading"
+            aria-expanded={settingsOpen}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            Settings {settingsOpen ? "-" : "+"}
+          </button>
+
+          {settingsOpen ? (
+            <div className="nav-group">
+              {settingsNavItems.map(([to, label]) => (
+                <Link key={to} to={to}>
+                  {to === "/login" && auth.authenticated ? "Change Password" : label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
         </nav>
         <div className="sidebar-footer">
           <p>&copy; 2026 &ndash; Licensed Under AGPL&nbsp;V3</p>
@@ -94,8 +118,9 @@ export function App() {
       </aside>
       <main className="content">
         <Routes>
-          <Route path="/" element={<Navigate to={auth.authenticated ? "/logs" : "/login"} replace />} />
+            <Route path="/" element={<Navigate to={auth.authenticated ? "/read" : "/login"} replace />} />
           <Route path="/login" element={<LoginPage auth={auth} onAuthChanged={refreshAuth} />} />
+            <Route path="/read" element={protect(<ReadPage />)} />
           <Route path="/status" element={protect(<StatusPage />)} />
           <Route path="/config" element={protect(<ConfigPage />)} />
           <Route path="/tuning" element={protect(<TuningPage />)} />
