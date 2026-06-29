@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { getJSON, postJSON } from "./api/client";
 import { ConfigPage } from "./pages/ConfigPage";
@@ -38,12 +38,24 @@ type InboxFoldersResponse = {
   folders: string[];
 };
 
+type ComposeMode = "text" | "html" | "markup";
+
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveFolders, setArchiveFolders] = useState<string[]>([]);
   const [archiveFoldersLoading, setArchiveFoldersLoading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeCc, setComposeCc] = useState("");
+  const [composeBcc, setComposeBcc] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeMode, setComposeMode] = useState<ComposeMode>("text");
+  const [composeTextBody, setComposeTextBody] = useState("");
+  const [composeHtmlBody, setComposeHtmlBody] = useState("");
+  const [composeMarkupBody, setComposeMarkupBody] = useState("");
+  const htmlEditorRef = useRef<HTMLDivElement | null>(null);
 
   async function refreshAuth() {
     try {
@@ -87,6 +99,68 @@ export function App() {
     void loadArchiveFolders();
   }, [archiveOpen, auth?.authenticated]);
 
+  useEffect(() => {
+    if (!composeOpen || composeMode !== "html") return;
+    if (!htmlEditorRef.current) return;
+    htmlEditorRef.current.innerHTML = composeHtmlBody;
+  }, [composeOpen, composeMode]);
+
+  function resetComposeForm() {
+    setComposeTo("");
+    setComposeCc("");
+    setComposeBcc("");
+    setComposeSubject("");
+    setComposeMode("text");
+    setComposeTextBody("");
+    setComposeHtmlBody("");
+    setComposeMarkupBody("");
+  }
+
+  function openComposeWindow() {
+    setComposeOpen(true);
+  }
+
+  function getComposeBody(mode: ComposeMode): string {
+    if (mode === "html") {
+      return htmlEditorRef.current?.innerHTML ?? composeHtmlBody;
+    }
+    if (mode === "markup") {
+      return composeMarkupBody;
+    }
+    return composeTextBody;
+  }
+
+  function switchComposeMode(nextMode: ComposeMode) {
+    if (nextMode === composeMode) return;
+    if (composeMode === "html" && htmlEditorRef.current) {
+      setComposeHtmlBody(htmlEditorRef.current.innerHTML);
+    }
+    setComposeMode(nextMode);
+  }
+
+  function trashComposeDraft() {
+    resetComposeForm();
+    setComposeOpen(false);
+  }
+
+  function sendComposeEmail() {
+    if (typeof window === "undefined") return;
+    const to = composeTo.trim();
+    if (!to) {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (composeCc.trim()) params.set("cc", composeCc.trim());
+    if (composeBcc.trim()) params.set("bcc", composeBcc.trim());
+    if (composeSubject.trim()) params.set("subject", composeSubject.trim());
+    const body = getComposeBody(composeMode);
+    if (body.trim()) params.set("body", body);
+    const query = params.toString();
+    const mailtoURL = `mailto:${encodeURIComponent(to)}${query ? `?${query}` : ""}`;
+    window.location.href = mailtoURL;
+    setComposeOpen(false);
+  }
+
   if (auth === null) {
     return (
       <div className="shell">
@@ -110,6 +184,9 @@ export function App() {
   return (
     <div className="shell">
       <aside className="sidebar">
+        <button type="button" className="new-email-button" onClick={openComposeWindow}>
+          New Email
+        </button>
         <div className="sidebar-logo">
           <img src="/llamalabel.png" alt="Llama Labels" style={{ width: "100%", maxWidth: 180, display: "block", margin: "0 auto 0.75rem" }} />
         </div>
@@ -193,6 +270,90 @@ export function App() {
           <Route path="/logs" element={protect(<LogsPage />)} />
         </Routes>
       </main>
+      {composeOpen ? (
+        <div className="compose-backdrop" role="dialog" aria-modal="true" onClick={() => setComposeOpen(false)}>
+          <section className="compose-window" onClick={(event) => event.stopPropagation()}>
+            <div className="compose-topbar">
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button type="button" className="compose-send" onClick={sendComposeEmail}>Send</button>
+                <button type="button" className="compose-trash" onClick={trashComposeDraft}>Trash</button>
+              </div>
+              <button type="button" className="compose-close" onClick={() => setComposeOpen(false)}>Close</button>
+            </div>
+
+            <div className="compose-form-grid">
+              <label className="compose-field-row">
+                <span>TO:</span>
+                <input type="text" value={composeTo} onChange={(event) => setComposeTo(event.target.value)} placeholder="recipient@example.com" />
+              </label>
+              <label className="compose-field-row">
+                <span>CC:</span>
+                <input type="text" value={composeCc} onChange={(event) => setComposeCc(event.target.value)} placeholder="cc@example.com" />
+              </label>
+              <label className="compose-field-row">
+                <span>BCC:</span>
+                <input type="text" value={composeBcc} onChange={(event) => setComposeBcc(event.target.value)} placeholder="bcc@example.com" />
+              </label>
+              <label className="compose-field-row">
+                <span>Subject:</span>
+                <input type="text" value={composeSubject} onChange={(event) => setComposeSubject(event.target.value)} placeholder="Subject" />
+              </label>
+            </div>
+
+            <div className="compose-mode-bar">
+              <button
+                type="button"
+                className={`compose-mode-button ${composeMode === "text" ? "active" : ""}`}
+                onClick={() => switchComposeMode("text")}
+              >
+                Plain Text
+              </button>
+              <button
+                type="button"
+                className={`compose-mode-button ${composeMode === "html" ? "active" : ""}`}
+                onClick={() => switchComposeMode("html")}
+              >
+                WYSIWYG HTML
+              </button>
+              <button
+                type="button"
+                className={`compose-mode-button ${composeMode === "markup" ? "active" : ""}`}
+                onClick={() => switchComposeMode("markup")}
+              >
+                Markup
+              </button>
+            </div>
+
+            {composeMode === "text" ? (
+              <textarea
+                className="compose-editor"
+                value={composeTextBody}
+                onChange={(event) => setComposeTextBody(event.target.value)}
+                placeholder="Write your email in plain text"
+              />
+            ) : null}
+
+            {composeMode === "html" ? (
+              <div
+                ref={htmlEditorRef}
+                className="compose-editor compose-editor-html"
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(event) => setComposeHtmlBody((event.currentTarget as HTMLDivElement).innerHTML)}
+              />
+            ) : null}
+
+            {composeMode === "markup" ? (
+              <textarea
+                className="compose-editor"
+                value={composeMarkupBody}
+                onChange={(event) => setComposeMarkupBody(event.target.value)}
+                placeholder="Write your email in Markdown or other markup"
+              />
+            ) : null}
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

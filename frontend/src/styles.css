@@ -35,6 +35,21 @@ body {
   flex-direction: column;
 }
 
+.new-email-button {
+  width: 100%;
+  border: 1px solid #78a100;
+  background: linear-gradient(180deg, #9bc400, #7ea100);
+  color: #1a2400;
+  border-radius: 10px;
+  padding: 10px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.new-email-button:hover {
+  filter: brightness(1.06);
+}
+
 .sidebar-logo {
   margin-bottom: 16px;
 }
@@ -295,6 +310,104 @@ pre {
   gap: 6px;
 }
 
+.compose-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 12, 18, 0.68);
+  display: grid;
+  place-items: center;
+  z-index: 2500;
+  padding: 16px;
+}
+
+.compose-window {
+  width: min(920px, 96vw);
+  min-height: min(760px, 90vh);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  gap: 12px;
+}
+
+.compose-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+
+.compose-send {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a2400;
+  font-weight: 700;
+}
+
+.compose-trash,
+.compose-close {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-strong);
+}
+
+.compose-form-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.compose-field-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.compose-field-row span {
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.compose-mode-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.compose-mode-button {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--ink-strong);
+}
+
+.compose-mode-button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a2400;
+  font-weight: 700;
+}
+
+.compose-editor {
+  width: 100%;
+  min-height: min(420px, 52vh);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #1d1d24;
+  color: var(--ink-strong);
+  padding: 12px;
+  font: inherit;
+  resize: vertical;
+}
+
+.compose-editor-html {
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;
@@ -306,6 +419,17 @@ pre {
   }
 
   .health-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compose-window {
+    min-height: min(700px, 96vh);
+    width: min(980px, 100vw);
+    border-radius: 10px;
+    padding: 12px;
+  }
+
+  .compose-field-row {
     grid-template-columns: 1fr;
   }
 }
