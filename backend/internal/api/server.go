@@ -845,6 +845,7 @@ func (s *Server) handleInboxActions(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Action     string   `json:"action"`
 		MessageIDs []string `json:"messageIds"`
+		Mailbox    string   `json:"mailbox"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
@@ -852,6 +853,7 @@ func (s *Server) handleInboxActions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	action := strings.ToLower(strings.TrimSpace(req.Action))
+	mailbox := strings.TrimSpace(req.Mailbox)
 	switch action {
 	case "delete", "archive", "spam", "read":
 	default:
@@ -884,7 +886,7 @@ func (s *Server) handleInboxActions(w http.ResponseWriter, r *http.Request) {
 	failures := make([]inboxActionFailure, 0)
 	processed := 0
 	for _, messageID := range uniqueIDs {
-		if err := s.mail.ApplyInboxAction(r.Context(), messageID, action); err != nil {
+		if err := s.mail.ApplyInboxAction(r.Context(), messageID, action, mailbox); err != nil {
 			failures = append(failures, inboxActionFailure{MessageID: messageID, Error: err.Error()})
 			continue
 		}

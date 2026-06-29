@@ -78,7 +78,7 @@ type Client interface {
 	ListSubfolders(ctx context.Context, parent string) ([]string, error)
 	EnsureLabel(ctx context.Context, label string) error
 	ApplyLabel(ctx context.Context, messageID, label string) error
-	ApplyInboxAction(ctx context.Context, messageID, action string) error
+	ApplyInboxAction(ctx context.Context, messageID, action, mailbox string) error
 	SaveDraft(ctx context.Context, draft DraftMessage) error
 }
 
@@ -108,7 +108,7 @@ func (s *StubClient) ApplyLabel(_ context.Context, _ string, _ string) error {
 	return nil
 }
 
-func (s *StubClient) ApplyInboxAction(_ context.Context, _ string, _ string) error {
+func (s *StubClient) ApplyInboxAction(_ context.Context, _ string, _ string, _ string) error {
 	return nil
 }
 
@@ -602,7 +602,7 @@ func (c *APIClient) ApplyLabel(ctx context.Context, messageID, label string) err
 	return nil
 }
 
-func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action string) error {
+func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action, mailbox string) error {
 	c.opMu.Lock()
 	defer c.opMu.Unlock()
 
@@ -618,6 +618,12 @@ func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action stri
 	d, err := c.ensureConnectedLocked()
 	if err != nil {
 		return err
+	}
+	mailbox = strings.TrimSpace(mailbox)
+	if mailbox != "" && !strings.EqualFold(mailbox, c.mailbox) {
+		if err := d.SelectFolder(mailbox); err != nil {
+			return fmt.Errorf("imap select folder %q: %w", mailbox, err)
+		}
 	}
 
 	moveToFolder := func(folder string) error {

@@ -145,7 +145,8 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
     try {
       const response = await postJSON<InboxActionResponse>("/api/inbox/actions", {
         action,
-        messageIds
+        messageIds,
+        mailbox
       });
       if (response.failed.length > 0) {
         const first = response.failed[0];
