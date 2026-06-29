@@ -11,11 +11,11 @@ import { StatusPage } from "./pages/StatusPage";
 import { TuningPage } from "./pages/TuningPage";
 
 const primaryNavItems = [
-  ["/read", "Read"],
-  ["/status", "Status"]
+  ["/read", "Inbox"]
 ] as const;
 const settingsNavItems = [
   ["/login", "Login"],
+  ["/status", "Status"],
   ["/config", "Config"],
   ["/tuning", "Tuning"],
   ["/logs", "Logs"]
