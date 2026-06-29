@@ -54,6 +54,7 @@ function processEmailHtml(html: string, showImages: boolean): string {
 export function ReadPage({ onOpenDraft }: ReadPageProps) {
   const [searchParams] = useSearchParams();
   const mailbox = (searchParams.get("mailbox") || "").trim();
+  const isInboxMailbox = mailbox.length === 0;
   const [tabs, setTabs] = useState<string[]>([]);
   const [byTab, setByTab] = useState<Record<string, InboxEmail[]>>({});
   const [activeTab, setActiveTab] = useState<string>("");
@@ -110,9 +111,12 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
   }, [mailbox]);
 
   const rows = useMemo(() => {
-    if (!activeTab) return [];
-    return byTab[activeTab] ?? [];
-  }, [activeTab, byTab]);
+    if (isInboxMailbox) {
+      if (!activeTab) return [];
+      return byTab[activeTab] ?? [];
+    }
+    return tabs.flatMap((tab) => byTab[tab] ?? []);
+  }, [isInboxMailbox, activeTab, byTab, tabs]);
 
   const selectedInTab = useMemo(
     () => rows.filter((row) => selectedMessageIds.includes(row.messageId)),
@@ -298,54 +302,56 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
       {error ? <p className="notice notice-error">Failed to load inbox: {error}</p> : null}
       {actionError ? <p className="notice notice-error">Inbox action failed: {actionError}</p> : null}
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14, marginBottom: 14 }}>
-        {tabs.map((tab) => {
-          const unreadCount = (byTab[tab] ?? []).filter((item) => item.status !== "read").length;
-          const isActive = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              style={{
-                background: isActive ? "var(--accent)" : "transparent",
-                color: isActive ? "#2f3a00" : "var(--ink-strong)",
-                border: "1px solid var(--line)",
-                borderRadius: 999,
-                padding: "0.38rem 0.78rem",
-                fontSize: "0.82rem",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8
-              }}
-            >
-              <span>{tab}</span>
-              <span
+      {isInboxMailbox ? (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14, marginBottom: 14 }}>
+          {tabs.map((tab) => {
+            const unreadCount = (byTab[tab] ?? []).filter((item) => item.status !== "read").length;
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
                 style={{
-                  minWidth: 18,
-                  height: 18,
-                  borderRadius: 999,
+                  background: isActive ? "var(--accent)" : "transparent",
+                  color: isActive ? "#2f3a00" : "var(--ink-strong)",
                   border: "1px solid var(--line)",
-                  background: isActive ? "rgba(255, 255, 255, 0.38)" : "var(--accent-soft)",
-                  color: "var(--ink-strong)",
+                  borderRadius: 999,
+                  padding: "0.38rem 0.78rem",
+                  fontSize: "0.82rem",
                   display: "inline-flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 6px",
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                  lineHeight: 1
+                  gap: 8
                 }}
               >
-                {unreadCount}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span>{tab}</span>
+                <span
+                  style={{
+                    minWidth: 18,
+                    height: 18,
+                    borderRadius: 999,
+                    border: "1px solid var(--line)",
+                    background: isActive ? "rgba(255, 255, 255, 0.38)" : "var(--accent-soft)",
+                    color: "var(--ink-strong)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 6px",
+                    fontSize: "0.72rem",
+                    fontWeight: 700,
+                    lineHeight: 1
+                  }}
+                >
+                  {unreadCount}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {rows.length === 0 ? (
-        <p style={{ opacity: 0.75 }}>No emails in this tab yet.</p>
+        <p style={{ opacity: 0.75 }}>{isInboxMailbox ? "No emails in this tab yet." : "No emails yet."}</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -402,8 +402,8 @@ pre {
   min-height: min(420px, 52vh);
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #1d1d24;
-  color: var(--ink-strong);
+  background: #fff;
+  color: #202124;
   padding: 12px;
   font: inherit;
   resize: vertical;
@@ -428,10 +428,14 @@ pre {
   min-height: min(360px, 46vh);
   font-family: var(--sans);
   font-size: 0.95rem;
+  background: #fff;
+  color: #202124;
 }
 
 .compose-editor-html .ql-editor {
   min-height: min(360px, 46vh);
+  background: #fff;
+  color: #202124;
 }
 
 .compose-editor-html .ql-toolbar button,

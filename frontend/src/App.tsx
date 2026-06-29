@@ -113,6 +113,10 @@ export function App() {
     if (!composeOpen) return;
     if (!quillEditorRef.current) return;
 
+    if (quillInstanceRef.current && quillInstanceRef.current.container !== quillEditorRef.current) {
+      quillInstanceRef.current = null;
+    }
+
     if (!quillInstanceRef.current) {
       const quill = new Quill(quillEditorRef.current, {
         theme: "snow"
