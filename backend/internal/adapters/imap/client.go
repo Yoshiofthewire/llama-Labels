@@ -386,9 +386,11 @@ func (c *APIClient) ListUnreadMessages(ctx context.Context, limit int) ([]Unread
 			atUTC = ts.UTC().Format(time.RFC3339)
 		}
 
-		body := strings.TrimSpace(e.Text)
+		// Prefer HTML for inbox preview so the UI can render rich email content.
+		// Fall back to plain text for text-only messages.
+		body := strings.TrimSpace(e.HTML)
 		if body == "" {
-			body = htmlToPlainText(e.HTML)
+			body = strings.TrimSpace(e.Text)
 		}
 
 		out = append(out, UnreadMessage{
