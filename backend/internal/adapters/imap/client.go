@@ -102,6 +102,7 @@ func (s *StubClient) ApplyInboxAction(_ context.Context, _ string, _ string) err
 
 type APIClient struct {
 	mu       sync.Mutex
+	opMu     sync.Mutex
 	dialer   *goimap.Dialer
 	host     string
 	port     int
@@ -257,6 +258,9 @@ func decryptStoredPayload(raw []byte, keyPath string) ([]byte, error) {
 }
 
 func (c *APIClient) ListUnreadInbox(ctx context.Context, sinceCheckpoint string) ([]Message, string, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
@@ -325,6 +329,9 @@ func (c *APIClient) ListUnreadInbox(ctx context.Context, sinceCheckpoint string)
 }
 
 func (c *APIClient) ListUnreadMessages(ctx context.Context, mailbox string, limit int) ([]UnreadMessage, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -431,6 +438,9 @@ func (c *APIClient) ListUnreadMessages(ctx context.Context, mailbox string, limi
 }
 
 func (c *APIClient) ListLabels(ctx context.Context) ([]string, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -477,6 +487,9 @@ func (c *APIClient) ListLabels(ctx context.Context) ([]string, error) {
 }
 
 func (c *APIClient) ListSubfolders(ctx context.Context, parent string) ([]string, error) {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -544,6 +557,9 @@ func (c *APIClient) EnsureLabel(ctx context.Context, label string) error {
 }
 
 func (c *APIClient) ApplyLabel(ctx context.Context, messageID, label string) error {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -569,6 +585,9 @@ func (c *APIClient) ApplyLabel(ctx context.Context, messageID, label string) err
 }
 
 func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action string) error {
+	c.opMu.Lock()
+	defer c.opMu.Unlock()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
