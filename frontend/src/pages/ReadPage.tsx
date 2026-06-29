@@ -41,6 +41,7 @@ export function ReadPage() {
   const [activeTab, setActiveTab] = useState<string>("");
   const [selected, setSelected] = useState<InboxEmail | null>(null);
   const [showImages, setShowImages] = useState(false);
+  const [showRawEmail, setShowRawEmail] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -160,6 +161,7 @@ export function ReadPage() {
                       onClick={() => {
                         setSelected(item);
                         setShowImages(false);
+                        setShowRawEmail(false);
                       }}
                       style={{
                         padding: 0,
@@ -226,52 +228,89 @@ export function ReadPage() {
               <p style={{ margin: 0 }}><strong>Time:</strong> {formatTimestamp(selected.atUtc)}</p>
               {selected.detail ? <p style={{ margin: 0 }}><strong>Detail:</strong> {selected.detail}</p> : null}
               <div>
-                {(() => {
-                  const body = selected.body && selected.body.trim() !== "" ? selected.body : "No message body available.";
-                  const isHtml = /<[^>]+>/.test(body);
-                  
-                  if (isHtml) {
-                    return (
-                      <div
-                        style={{
-                          margin: 0,
-                          maxHeight: "40vh",
-                          overflowY: "auto",
-                          border: "1px solid var(--line)",
-                          borderRadius: 8,
-                          padding: "10px 12px",
-                          background: "var(--bg)",
-                          color: "var(--ink-strong)",
-                          wordBreak: "break-word"
-                        }}
-                        dangerouslySetInnerHTML={{ __html: processEmailHtml(body, showImages) }}
-                      />
-                    );
-                  } else {
-                    return (
-                      <pre
-                        style={{
-                          margin: 0,
-                          maxHeight: "40vh",
-                          overflowY: "auto",
-                          border: "1px solid var(--line)",
-                          borderRadius: 8,
-                          padding: "10px 12px",
-                          background: "var(--bg)",
-                          color: "var(--ink-strong)",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          fontFamily: "var(--mono)"
-                        }}
-                      >
-                        {body}
-                      </pre>
-                    );
-                  }
-                })()}
-                <p style={{ margin: "6px 0 0", fontSize: "0.75rem", opacity: 0.7 }}>
-                  Remote images are not loaded by default.
-                </p>
+                {showRawEmail ? (
+                  <pre
+                    style={{
+                      margin: 0,
+                      maxHeight: "40vh",
+                      overflowY: "auto",
+                      border: "1px solid var(--line)",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      background: "var(--bg)",
+                      color: "var(--ink-strong)",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      fontFamily: "var(--mono)"
+                    }}
+                  >
+                    {selected.body && selected.body.trim() !== "" ? selected.body : "No message body available."}
+                  </pre>
+                ) : (
+                  (() => {
+                    const body = selected.body && selected.body.trim() !== "" ? selected.body : "No message body available.";
+                    const isHtml = /<[^>]+>/.test(body);
+                    
+                    if (isHtml) {
+                      return (
+                        <div
+                          style={{
+                            margin: 0,
+                            maxHeight: "40vh",
+                            overflowY: "auto",
+                            border: "1px solid var(--line)",
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            background: "var(--bg)",
+                            color: "var(--ink-strong)",
+                            wordBreak: "break-word"
+                          }}
+                          dangerouslySetInnerHTML={{ __html: processEmailHtml(body, showImages) }}
+                        />
+                      );
+                    } else {
+                      return (
+                        <pre
+                          style={{
+                            margin: 0,
+                            maxHeight: "40vh",
+                            overflowY: "auto",
+                            border: "1px solid var(--line)",
+                            borderRadius: 8,
+                            padding: "10px 12px",
+                            background: "var(--bg)",
+                            color: "var(--ink-strong)",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            fontFamily: "var(--mono)"
+                          }}
+                        >
+                          {body}
+                        </pre>
+                      );
+                    }
+                  })()
+                )}
+                <div style={{ marginTop: 8, display: "flex", gap: 12, fontSize: "0.75rem", opacity: 0.7 }}>
+                  {!showRawEmail && (
+                    <p style={{ margin: 0 }}>Remote images are not loaded by default.</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowRawEmail(!showRawEmail)}
+                    style={{
+                      padding: 0,
+                      border: 0,
+                      background: "transparent",
+                      color: "var(--accent)",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      font: "inherit"
+                    }}
+                  >
+                    {showRawEmail ? "Hide raw email" : "View raw email"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
