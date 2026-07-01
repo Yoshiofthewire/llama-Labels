@@ -364,6 +364,7 @@ export function ConfigPage() {
           onChange={(event) => updateConfig("rateLimits", { ...cfg.rateLimits, perHour: Number(event.target.value) || 0 })}
         />
       </label>
+      <button type="button" onClick={saveConfig}>Save Configuration</button>
 
       <hr />
       <h3>IMAP</h3>
