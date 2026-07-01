@@ -63,6 +63,7 @@ All code under `frontend/`. Produces a static bundle under `frontend/dist/` cons
 - Custom folder controls are behind a three-dot menu with Rename and Delete; built-in IMAP folders must not render this menu
 - Dragging an email row from ReadPage and dropping onto a sidebar folder (including Inbox and Archive buckets) sends `POST /api/inbox/actions` with `action=move` and refreshes mailbox views via a `mailbox-move-complete` window event
 - ReadPage no longer shows a manual refresh button; it shows a centered clickable "Updated Just Now" label at the bottom of the inbox page and switches to a localized time once the last inbox refresh is older than 3 minutes
+- Rendered email HTML in ReadPage forces all links to open in a new tab with `target="_blank"` and `rel="noopener noreferrer"`
 
 ## Verification
 

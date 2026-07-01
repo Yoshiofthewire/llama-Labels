@@ -60,10 +60,31 @@ function processEmailHtml(html: string, showImages: boolean): string {
   // Extract body content if it's a full HTML document
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
   const content = bodyMatch ? bodyMatch[1] : html;
-  
-  // Replace img tags with [Image Blocked] if not showing images
-  if (showImages) return content;
-  return content.replace(/<img[^>]*>/gi, "[Image Blocked]");
+
+  if (typeof window === "undefined") {
+    if (showImages) return content;
+    return content.replace(/<img[^>]*>/gi, "[Image Blocked]");
+  }
+
+  const parser = new DOMParser();
+  const document = parser.parseFromString(`<div>${content}</div>`, "text/html");
+  const root = document.body.firstElementChild;
+  if (!root) {
+    return content;
+  }
+
+  root.querySelectorAll("a[href]").forEach((anchor) => {
+    anchor.setAttribute("target", "_blank");
+    anchor.setAttribute("rel", "noopener noreferrer");
+  });
+
+  if (!showImages) {
+    root.querySelectorAll("img").forEach((image) => {
+      image.replaceWith(document.createTextNode("[Image Blocked]"));
+    });
+  }
+
+  return root.innerHTML;
 }
 
 export function ReadPage({ onOpenDraft }: ReadPageProps) {
