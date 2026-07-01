@@ -8,11 +8,13 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/subtle"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/mail"
 	"net/smtp"
@@ -335,6 +337,57 @@ func smtpSendWithTimeout(addr string, auth smtp.Auth, from string, recipients []
 	}
 }
 
+func smtpSendWithImplicitTLS(host string, port int, username, password, from string, recipients []string, msg []byte, timeout time.Duration) error {
+	addr := fmt.Sprintf("%s:%d", host, port)
+	dialer := &net.Dialer{Timeout: timeout}
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12})
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+
+	client, err := smtp.NewClient(conn, host)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	if ok, _ := client.Extension("AUTH"); ok {
+		auth := smtp.PlainAuth("", username, password, host)
+		if err := client.Auth(auth); err != nil {
+			return err
+		}
+	}
+
+	if err := client.Mail(from); err != nil {
+		return err
+	}
+	for _, recipient := range recipients {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+
+	writer, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := writer.Write(msg); err != nil {
+		_ = writer.Close()
+		return err
+	}
+	if err := writer.Close(); err != nil {
+		return err
+	}
+
+	if err := client.Quit(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Server) handleMailSend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -433,10 +486,16 @@ func (s *Server) handleMailSend(w http.ResponseWriter, r *http.Request) {
 	recipients = append(recipients, bccList...)
 	s.logger.Info("mail send requested", "smtpHost", smtpHost, "smtpPort", strconv.Itoa(smtpPort), "recipientCount", strconv.Itoa(len(recipients)))
 
-	auth := smtp.PlainAuth("", payload.Username, payload.Password, smtpHost)
-	if err := smtpSendWithTimeout(addr, auth, from, recipients, msg.Bytes(), 20*time.Second); err != nil {
-		s.logger.Error("mail send failed", "smtpHost", smtpHost, "smtpPort", strconv.Itoa(smtpPort), "error", err.Error())
-		http.Error(w, fmt.Sprintf("failed to send email: %s", err.Error()), http.StatusBadGateway)
+	var sendErr error
+	if smtpPort == 465 {
+		sendErr = smtpSendWithImplicitTLS(smtpHost, smtpPort, payload.Username, payload.Password, from, recipients, msg.Bytes(), 45*time.Second)
+	} else {
+		auth := smtp.PlainAuth("", payload.Username, payload.Password, smtpHost)
+		sendErr = smtpSendWithTimeout(addr, auth, from, recipients, msg.Bytes(), 45*time.Second)
+	}
+	if sendErr != nil {
+		s.logger.Error("mail send failed", "smtpHost", smtpHost, "smtpPort", strconv.Itoa(smtpPort), "error", sendErr.Error())
+		http.Error(w, fmt.Sprintf("failed to send email: %s", sendErr.Error()), http.StatusBadGateway)
 		return
 	}
 

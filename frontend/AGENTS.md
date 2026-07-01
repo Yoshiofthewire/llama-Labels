@@ -15,7 +15,7 @@ All code under `frontend/`. Produces a static bundle under `frontend/dist/` cons
 - Auth state is owned by `App.tsx`; pages read it via props, not via direct `/api/auth/me` calls
 - All pages live under `src/pages/`; routing is defined in `App.tsx`
 - Session cookie (`credentials: 'include'`) is required on every API call — this is handled by `client.ts`
-- Compose window is owned by `App.tsx`; it always uses Quill WYSIWYG and sends via `POST /api/mail/send` (UI shows backend warning when SMTP send succeeds but Sent-folder append fails)
+- Compose window is owned by `App.tsx`; it always uses Quill WYSIWYG and sends via `POST /api/mail/send` (window auto-closes after successful SMTP send, including success-with-warning responses)
 
 ### Page → API Mapping
 

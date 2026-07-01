@@ -396,7 +396,7 @@ export function App() {
     setComposeSuccess("");
     const body = quillInstanceRef.current?.root.innerHTML ?? composeHtmlBody;
     try {
-      const result = await postJSON<{ ok: boolean; sentSaved?: boolean; warning?: string }>("/api/mail/send", {
+      await postJSON<{ ok: boolean; sentSaved?: boolean; warning?: string }>("/api/mail/send", {
         to,
         cc: composeCc.trim(),
         bcc: composeBcc.trim(),
@@ -404,11 +404,6 @@ export function App() {
         body,
         mode: "html"
       });
-      if (result.warning) {
-        setComposeSuccess(`Email sent. ${result.warning}`);
-        return;
-      }
-      setComposeSuccess("Email sent.");
       setComposeOpen(false);
       resetComposeForm();
     } catch (e) {
@@ -659,11 +654,19 @@ export function App() {
         </Routes>
       </main>
       {composeOpen ? (
-        <div className="compose-backdrop" role="dialog" aria-modal="true" onClick={closeComposeWindow}>
-          <section className="compose-window" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="compose-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={composeSending ? undefined : closeComposeWindow}
+        >
+          <section
+            className={`compose-window${composeSending ? " compose-window-sending" : ""}`}
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="compose-topbar">
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button type="button" className="compose-send" onClick={() => void sendComposeEmail()} disabled={composeSending || composeSavingDraft}>Send</button>
+                <button type="button" className="compose-send" onClick={() => void sendComposeEmail()} disabled={composeSending || composeSavingDraft}>{composeSending ? "Sending..." : "Send"}</button>
                 <button type="button" className="compose-save-draft" onClick={() => void saveComposeDraft()} disabled={composeSending || composeSavingDraft}>Save Draft</button>
                 <button type="button" className="compose-trash" onClick={trashComposeDraft} disabled={composeSending || composeSavingDraft}>Trash</button>
               </div>
@@ -676,19 +679,19 @@ export function App() {
             <div className="compose-form-grid">
               <label className="compose-field-row">
                 <span>TO:</span>
-                <input type="text" value={composeTo} onChange={(event) => setComposeTo(event.target.value)} placeholder="recipient@example.com" />
+                <input type="text" value={composeTo} onChange={(event) => setComposeTo(event.target.value)} placeholder="recipient@example.com" disabled={composeSending || composeSavingDraft} />
               </label>
               <label className="compose-field-row">
                 <span>CC:</span>
-                <input type="text" value={composeCc} onChange={(event) => setComposeCc(event.target.value)} placeholder="cc@example.com" />
+                <input type="text" value={composeCc} onChange={(event) => setComposeCc(event.target.value)} placeholder="cc@example.com" disabled={composeSending || composeSavingDraft} />
               </label>
               <label className="compose-field-row">
                 <span>BCC:</span>
-                <input type="text" value={composeBcc} onChange={(event) => setComposeBcc(event.target.value)} placeholder="bcc@example.com" />
+                <input type="text" value={composeBcc} onChange={(event) => setComposeBcc(event.target.value)} placeholder="bcc@example.com" disabled={composeSending || composeSavingDraft} />
               </label>
               <label className="compose-field-row">
                 <span>Subject:</span>
-                <input type="text" value={composeSubject} onChange={(event) => setComposeSubject(event.target.value)} placeholder="Subject" />
+                <input type="text" value={composeSubject} onChange={(event) => setComposeSubject(event.target.value)} placeholder="Subject" disabled={composeSending || composeSavingDraft} />
               </label>
             </div>
 

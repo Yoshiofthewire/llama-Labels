@@ -442,6 +442,11 @@ pre {
   gap: 12px;
 }
 
+.compose-window-sending {
+  opacity: 0.62;
+  filter: grayscale(0.35);
+}
+
 .compose-topbar {
   display: flex;
   justify-content: space-between;
@@ -522,7 +527,7 @@ pre {
   min-height: min(420px, 52vh);
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #1a1a1e;
+  background: var(--panel);
   color: var(--ink-strong);
   padding: 12px;
   font: inherit;
@@ -532,7 +537,7 @@ pre {
 .compose-editor-html {
   overflow: hidden;
   padding: 0;
-  background: #1a1a1e;
+  background: var(--panel);
   color: var(--ink-strong);
 }
 
@@ -540,7 +545,7 @@ pre {
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 10px 10px 0 0;
-  background: #2a2530;
+  background: var(--panel);
   color: var(--ink-strong);
 }
 
@@ -549,13 +554,13 @@ pre {
   min-height: min(360px, 46vh);
   font-family: var(--sans);
   font-size: 0.95rem;
-  background: #1a1a1e;
+  background: var(--panel);
   color: var(--ink-strong);
 }
 
 .compose-editor-html .ql-editor {
   min-height: min(360px, 46vh);
-  background: #1a1a1e;
+  background: var(--panel);
   color: var(--ink-strong);
 }
 
