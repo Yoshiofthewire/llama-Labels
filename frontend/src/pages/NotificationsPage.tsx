@@ -19,6 +19,18 @@ type LabelsResponse = {
   imap: string[];
 };
 
+function uniqueLabels(labels: string[]): string[] {
+  return Array.from(new Set(labels.map((label) => label.trim()).filter(Boolean)));
+}
+
+function collectNotificationKeywordOptions(cfg: AppConfig, labelsData: LabelsResponse): string[] {
+  const configured = cfg.labels.allowlist ?? [];
+  const mapped = Object.values(cfg.labels.keywordMappings ?? {}).flat();
+  const imap = labelsData.imap ?? [];
+  const selected = cfg.notifications.keywords ?? [];
+  return uniqueLabels([...configured, ...mapped, ...imap, ...selected]);
+}
+
 function normalizeConfig(input: unknown): AppConfig {
   const source = (input ?? {}) as Record<string, any>;
   const notifications = source.notifications ?? {};
@@ -66,7 +78,7 @@ export function NotificationsPage() {
         }
         const normalized = normalizeConfig(nextConfig);
         setCfg(normalized);
-        setAvailableKeywords(uniqueLabels(labelsData.imap ?? []));
+        setAvailableKeywords(collectNotificationKeywordOptions(normalized, labelsData));
       } catch {
         if (!cancelled) {
           setStatus("Failed to load notification settings.");
