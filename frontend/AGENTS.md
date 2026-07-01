@@ -35,7 +35,7 @@ All code under `frontend/`. Produces a static bundle under `frontend/dist/` cons
 
 | Component | Endpoints used |
 |-----------|----------------|
-| `App.tsx` | `GET /api/auth/me`, `GET /api/inbox/folders?parent=Archive`, `POST /api/auth/logout`, `POST /api/mail/send`, `POST /api/mail/draft` |
+| `App.tsx` | `GET /api/auth/me`, `GET /api/inbox/folders`, `GET /api/inbox/folders?parent=Archive`, `POST /api/auth/logout`, `POST /api/mail/send`, `POST /api/mail/draft` |
 
 ### Auth Flow
 
@@ -50,6 +50,7 @@ All code under `frontend/`. Produces a static bundle under `frontend/dist/` cons
 - Dev server: `cd frontend && npm run dev` (proxies API calls to `localhost:5866`)
 - Do not add direct `fetch` calls outside `src/api/client.ts`
 - Add new pages to the router in `App.tsx` and the nav layout in the same file
+- Left nav inbox links are driven by `GET /api/inbox/folders` for top-level non-Archive folders and `GET /api/inbox/folders?parent=Archive` for archive buckets
 
 ## Verification
 

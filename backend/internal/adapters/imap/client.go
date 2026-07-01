@@ -512,9 +512,6 @@ func (c *APIClient) ListSubfolders(ctx context.Context, parent string) ([]string
 		return nil, err
 	}
 	parent = strings.TrimSpace(parent)
-	if parent == "" {
-		return nil, errors.New("parent folder is required")
-	}
 
 	d, err := c.ensureConnectedLocked()
 	if err != nil {
@@ -524,6 +521,49 @@ func (c *APIClient) ListSubfolders(ctx context.Context, parent string) ([]string
 	folders, err := d.GetFolders()
 	if err != nil {
 		return nil, fmt.Errorf("imap list folders: %w", err)
+	}
+
+	if parent == "" {
+		children := []string{}
+		seen := map[string]bool{}
+		for _, folder := range folders {
+			clean := strings.TrimSpace(folder)
+			if clean == "" || strings.EqualFold(clean, "INBOX") {
+				continue
+			}
+
+			topLevel := clean
+			if strings.HasPrefix(strings.ToUpper(clean), "INBOX/") || strings.HasPrefix(strings.ToUpper(clean), "INBOX.") {
+				rest := clean[len("INBOX/"):]
+				if strings.HasPrefix(strings.ToUpper(clean), "INBOX.") {
+					rest = clean[len("INBOX."):]
+				}
+				if idx := strings.IndexAny(rest, "/."); idx >= 0 {
+					rest = rest[:idx]
+				}
+				sep := "/"
+				if strings.HasPrefix(strings.ToUpper(clean), "INBOX.") {
+					sep = "."
+				}
+				topLevel = "INBOX" + sep + strings.TrimSpace(rest)
+			} else if idx := strings.IndexAny(clean, "/."); idx >= 0 {
+				topLevel = clean[:idx]
+			}
+
+			label := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(topLevel, "INBOX/"), "INBOX."))
+			if label == "" || strings.EqualFold(label, "Archive") {
+				continue
+			}
+			key := strings.ToLower(topLevel)
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			children = append(children, topLevel)
+		}
+
+		sort.Strings(children)
+		return children, nil
 	}
 
 	parentLower := strings.ToLower(parent)
@@ -537,18 +577,32 @@ func (c *APIClient) ListSubfolders(ctx context.Context, parent string) ([]string
 		child := ""
 		for _, prefix := range []string{parent + "/", parent + ".", "INBOX/" + parent + "/", "INBOX." + parent + "."} {
 			if strings.HasPrefix(strings.ToLower(clean), strings.ToLower(prefix)) {
-				child = clean[len(prefix):]
+				rest := clean[len(prefix):]
+				if rest == "" {
+					break
+				}
+				child = clean
+				if idx := strings.IndexAny(rest, "/."); idx >= 0 {
+					child = prefix + rest[:idx]
+				}
 				break
 			}
 		}
 		if child == "" {
 			continue
 		}
-		if idx := strings.IndexAny(child, "/."); idx >= 0 {
-			child = child[:idx]
+		label := strings.TrimSpace(child)
+		if strings.HasPrefix(strings.ToLower(label), strings.ToLower("INBOX/"+parent+"/")) {
+			label = label[len("INBOX/"+parent+"/"):]
+		} else if strings.HasPrefix(strings.ToLower(label), strings.ToLower("INBOX."+parent+".")) {
+			label = label[len("INBOX."+parent+"."):]
+		} else if strings.HasPrefix(strings.ToLower(label), strings.ToLower(parent+"/")) {
+			label = label[len(parent+"/"):]
+		} else if strings.HasPrefix(strings.ToLower(label), strings.ToLower(parent+".")) {
+			label = label[len(parent+"."):]
 		}
-		child = strings.TrimSpace(child)
-		if child == "" {
+		label = strings.TrimSpace(label)
+		if label == "" {
 			continue
 		}
 		key := strings.ToLower(child)
@@ -636,6 +690,11 @@ func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action, mai
 		return d.MoveEmail(uid, folder)
 	}
 
+	isTrashMailbox := func(name string) bool {
+		clean := strings.TrimSpace(strings.ToLower(name))
+		return clean == "trash" || clean == "inbox/trash" || clean == "inbox.trash"
+	}
+
 	switch action {
 	case "read":
 		if err := d.MarkSeen(uid); err != nil {
@@ -675,8 +734,23 @@ func (c *APIClient) ApplyInboxAction(ctx context.Context, messageID, action, mai
 		}
 		return nil
 	case "delete":
-		if err := d.DeleteEmail(uid); err != nil {
-			return fmt.Errorf("imap delete uid %d: %w", uid, err)
+		if isTrashMailbox(mailbox) {
+			if err := d.DeleteEmail(uid); err != nil {
+				return fmt.Errorf("imap delete uid %d from Trash: %w", uid, err)
+			}
+			return nil
+		}
+		trashTargets := []string{"Trash", "INBOX/Trash", "INBOX.Trash"}
+		var lastErr error
+		for _, folder := range trashTargets {
+			if err := moveToFolder(folder); err == nil {
+				return nil
+			} else {
+				lastErr = err
+			}
+		}
+		if lastErr != nil {
+			return fmt.Errorf("imap move uid %d to Trash: %w", uid, lastErr)
 		}
 		return nil
 	default:

@@ -130,6 +130,21 @@ type imapConfigPayload struct {
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
 
+// normalizeIMAPPayload applies default values and trimming to IMAP config payload.
+func normalizeIMAPPayload(p imapConfigPayload) imapConfigPayload {
+	p.Host = strings.TrimSpace(p.Host)
+	p.Username = strings.TrimSpace(p.Username)
+	p.Password = strings.TrimSpace(p.Password)
+	p.Mailbox = strings.TrimSpace(p.Mailbox)
+	if p.Port <= 0 {
+		p.Port = 993
+	}
+	if p.Mailbox == "" {
+		p.Mailbox = "INBOX"
+	}
+	return p
+}
+
 func (s *Server) handleIMAPConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -160,19 +175,10 @@ func (s *Server) handleIMAPConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		payload.Host = strings.TrimSpace(payload.Host)
-		payload.Username = strings.TrimSpace(payload.Username)
-		payload.Password = strings.TrimSpace(payload.Password)
-		payload.Mailbox = strings.TrimSpace(payload.Mailbox)
+		payload = normalizeIMAPPayload(payload)
 		if payload.Host == "" || payload.Username == "" || payload.Password == "" {
 			http.Error(w, "host, username, and password are required", http.StatusBadRequest)
 			return
-		}
-		if payload.Port <= 0 {
-			payload.Port = 993
-		}
-		if payload.Mailbox == "" {
-			payload.Mailbox = "INBOX"
 		}
 		payload.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 
@@ -244,16 +250,7 @@ func (s *Server) handleIMAPTest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	req.Host = strings.TrimSpace(req.Host)
-	req.Username = strings.TrimSpace(req.Username)
-	req.Password = strings.TrimSpace(req.Password)
-	req.Mailbox = strings.TrimSpace(req.Mailbox)
-	if req.Port <= 0 {
-		req.Port = 993
-	}
-	if req.Mailbox == "" {
-		req.Mailbox = "INBOX"
-	}
+	req = normalizeIMAPPayload(req)
 
 	client, err := goimap.New(req.Username, req.Password, req.Host, req.Port)
 	if err != nil {
@@ -816,9 +813,6 @@ func (s *Server) handleInboxFolders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parent := strings.TrimSpace(r.URL.Query().Get("parent"))
-	if parent == "" {
-		parent = "Archive"
-	}
 
 	folders, err := s.mail.ListSubfolders(r.Context(), parent)
 	if err != nil {
@@ -1428,7 +1422,7 @@ func resolveTuningPath() string {
 	return "/llama_lab/config/TUNING.md"
 }
 
-func restartLlamaProcess(ctx context.Context) error {
+func restartProcess(ctx context.Context, processName string, onSuccess func()) error {
 	run := func(args ...string) (string, error) {
 		cmd := exec.CommandContext(ctx, "supervisorctl", args...)
 		cmd.Env = os.Environ()
@@ -1436,9 +1430,11 @@ func restartLlamaProcess(ctx context.Context) error {
 		return strings.TrimSpace(string(out)), err
 	}
 
-	out, err := run("-c", "/etc/supervisord.conf", "restart", "llama")
+	out, err := run("-c", "/etc/supervisord.conf", "restart", processName)
 	if err == nil {
-		llama.ResetWarmupState()
+		if onSuccess != nil {
+			onSuccess()
+		}
 		return nil
 	}
 
@@ -1448,9 +1444,11 @@ func restartLlamaProcess(ctx context.Context) error {
 	}
 	lower := strings.ToLower(msg)
 	if strings.Contains(lower, "not running") || strings.Contains(lower, "spawn error") || strings.Contains(lower, "fatal") {
-		startOut, startErr := run("-c", "/etc/supervisord.conf", "start", "llama")
+		startOut, startErr := run("-c", "/etc/supervisord.conf", "start", processName)
 		if startErr == nil {
-			llama.ResetWarmupState()
+			if onSuccess != nil {
+				onSuccess()
+			}
 			return nil
 		}
 		if strings.TrimSpace(startOut) != "" {
@@ -1458,38 +1456,15 @@ func restartLlamaProcess(ctx context.Context) error {
 		}
 	}
 
-	return fmt.Errorf("restart llama: %s", msg)
+	return fmt.Errorf("restart %s: %s", processName, msg)
+}
+
+func restartLlamaProcess(ctx context.Context) error {
+	return restartProcess(ctx, "llama", func() { llama.ResetWarmupState() })
 }
 
 func restartDaemonProcess(ctx context.Context) error {
-	run := func(args ...string) (string, error) {
-		cmd := exec.CommandContext(ctx, "supervisorctl", args...)
-		cmd.Env = os.Environ()
-		out, err := cmd.CombinedOutput()
-		return strings.TrimSpace(string(out)), err
-	}
-
-	out, err := run("-c", "/etc/supervisord.conf", "restart", "daemon")
-	if err == nil {
-		return nil
-	}
-
-	msg := out
-	if msg == "" {
-		msg = err.Error()
-	}
-	lower := strings.ToLower(msg)
-	if strings.Contains(lower, "not running") || strings.Contains(lower, "spawn error") || strings.Contains(lower, "fatal") {
-		startOut, startErr := run("-c", "/etc/supervisord.conf", "start", "daemon")
-		if startErr == nil {
-			return nil
-		}
-		if strings.TrimSpace(startOut) != "" {
-			msg = msg + "; start attempt: " + strings.TrimSpace(startOut)
-		}
-	}
-
-	return fmt.Errorf("restart daemon: %s", msg)
+	return restartProcess(ctx, "daemon", nil)
 }
 
 // signalDaemonProcessRestart finds the running `llama-lab --mode daemon` process

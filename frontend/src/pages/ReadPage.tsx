@@ -34,6 +34,9 @@ type InboxActionResponse = {
   failed: Array<{ messageId: string; error: string }>;
 };
 
+type SortKey = "time" | "subject" | "sender";
+type SortDirection = "asc" | "desc";
+
 function formatTimestamp(value: string): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -66,6 +69,8 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("time");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const isDraftMailbox = mailbox.toLowerCase().includes("drafts");
 
   async function loadInbox() {
@@ -118,24 +123,50 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
     return tabs.flatMap((tab) => byTab[tab] ?? []);
   }, [isInboxMailbox, activeTab, byTab, tabs]);
 
+  const sortedRows = useMemo(() => {
+    const next = [...rows];
+    const compareText = (left: string | undefined, right: string | undefined) =>
+      (left ?? "").localeCompare(right ?? "", undefined, { sensitivity: "base" });
+    const compareTime = (left: string, right: string) => {
+      const leftTime = Date.parse(left);
+      const rightTime = Date.parse(right);
+      const safeLeft = Number.isNaN(leftTime) ? 0 : leftTime;
+      const safeRight = Number.isNaN(rightTime) ? 0 : rightTime;
+      return safeLeft - safeRight;
+    };
+
+    next.sort((left, right) => {
+      const base =
+        sortKey === "subject"
+          ? compareText(left.subject, right.subject)
+          : sortKey === "sender"
+            ? compareText(left.sender, right.sender)
+            : compareTime(left.atUtc, right.atUtc);
+      return sortDirection === "asc" ? base : -base;
+    });
+
+    return next;
+  }, [rows, sortDirection, sortKey]);
+
   const selectedInTab = useMemo(
-    () => rows.filter((row) => selectedMessageIds.includes(row.messageId)),
-    [rows, selectedMessageIds]
+    () => sortedRows.filter((row) => selectedMessageIds.includes(row.messageId)),
+    [sortedRows, selectedMessageIds]
   );
 
-  const allRowsSelected = rows.length > 0 && selectedInTab.length === rows.length;
+  const allRowsSelected = sortedRows.length > 0 && selectedInTab.length === sortedRows.length;
 
-  function removeMessageIDs(messageIds: string[]) {
-    if (messageIds.length === 0) return;
-    const removeSet = new Set(messageIds);
-    setByTab((current) => {
-      const next: Record<string, InboxEmail[]> = {};
-      Object.entries(current).forEach(([tab, items]) => {
-        next[tab] = items.filter((item) => !removeSet.has(item.messageId));
-      });
-      return next;
-    });
-    setSelectedMessageIds((current) => current.filter((id) => !removeSet.has(id)));
+  function updateSort(nextKey: SortKey) {
+    if (sortKey === nextKey) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(nextKey);
+    setSortDirection(nextKey === "time" ? "desc" : "asc");
+  }
+
+  function sortLabel(column: SortKey, label: string): string {
+    if (sortKey !== column) return label;
+    return `${label} ${sortDirection === "asc" ? "↑" : "↓"}`;
   }
 
   async function applyInboxAction(action: InboxAction, messageIds: string[], options?: { closeModal?: boolean }) {
@@ -168,7 +199,8 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
           return { ...current, status: "read" };
         });
       } else {
-        removeMessageIDs(messageIds);
+        setSelectedMessageIds((current) => current.filter((id) => !messageIds.includes(id)));
+        await loadInbox();
       }
       if (options?.closeModal) {
         setSelected(null);
@@ -351,7 +383,7 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
         </div>
       ) : null}
 
-      {rows.length === 0 ? (
+      {sortedRows.length === 0 ? (
         <p style={{ opacity: 0.75 }}>{isInboxMailbox ? "No emails in this tab yet." : "No emails yet."}</p>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -364,7 +396,7 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
                     checked={allRowsSelected}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        const ids = rows.map((row) => row.messageId);
+                        const ids = sortedRows.map((row) => row.messageId);
                         setSelectedMessageIds((current) => {
                           const merged = new Set(current);
                           ids.forEach((id) => merged.add(id));
@@ -372,19 +404,31 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
                         });
                         return;
                       }
-                      const tabIDs = new Set(rows.map((row) => row.messageId));
+                      const tabIDs = new Set(sortedRows.map((row) => row.messageId));
                       setSelectedMessageIds((current) => current.filter((id) => !tabIDs.has(id)));
                     }}
                     aria-label="Select all emails in tab"
                   />
                 </th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>Subject</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>Sender</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>Time</th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>
+                  <button type="button" onClick={() => updateSort("subject")} style={{ padding: 0, border: 0, background: "transparent", color: "inherit", font: "inherit", cursor: "pointer" }}>
+                    {sortLabel("subject", "Subject")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>
+                  <button type="button" onClick={() => updateSort("sender")} style={{ padding: 0, border: 0, background: "transparent", color: "inherit", font: "inherit", cursor: "pointer" }}>
+                    {sortLabel("sender", "Sender")}
+                  </button>
+                </th>
+                <th style={{ textAlign: "left", borderBottom: "1px solid var(--line)", padding: "8px" }}>
+                  <button type="button" onClick={() => updateSort("time")} style={{ padding: 0, border: 0, background: "transparent", color: "inherit", font: "inherit", cursor: "pointer" }}>
+                    {sortLabel("time", "Time")}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((item) => {
+              {sortedRows.map((item) => {
                 const isRead = item.status === "read";
                 return (
                 <tr key={`${item.messageId}-${item.atUtc}`}>

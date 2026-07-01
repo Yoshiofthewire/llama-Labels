@@ -5,6 +5,7 @@ import "quill/dist/quill.snow.css";
 import { getJSON, postJSON } from "./api/client";
 import { ConfigPage } from "./pages/ConfigPage";
 import { DecisionsPage } from "./pages/DecisionsPage";
+import { HealthPage } from "./pages/HealthPage";
 import { LoginPage } from "./pages/LoginPage";
 import { LogsPage } from "./pages/LogsPage";
 import { LabelsPage } from "./pages/LabelsPage";
@@ -12,18 +13,10 @@ import { ReadPage } from "./pages/ReadPage";
 import { StatusPage } from "./pages/StatusPage";
 import { TuningPage } from "./pages/TuningPage";
 
-const primaryNavItems = [
-  ["/read", "Inbox"]
-] as const;
-const mailboxNavItems = [
-  ["/read?mailbox=Drafts", "Drafts"],
-  ["/read?mailbox=Sent", "Sent"],
-  ["/read?mailbox=Spam", "Spam"],
-  ["/read?mailbox=Trash", "Trash"]
-] as const;
 const settingsNavItems = [
   ["/login", "Login"],
   ["/status", "Status"],
+  ["/health", "Health"],
   ["/config", "Config"],
   ["/tuning", "Tuning"],
   ["/logs", "Logs"]
@@ -50,6 +43,8 @@ type DraftComposePayload = {
 
 export function App() {
   const [auth, setAuth] = useState<AuthState | null>(null);
+  const [mailboxFolders, setMailboxFolders] = useState<string[]>([]);
+  const [mailboxFoldersLoading, setMailboxFoldersLoading] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archiveFolders, setArchiveFolders] = useState<string[]>([]);
   const [archiveFoldersLoading, setArchiveFoldersLoading] = useState(false);
@@ -84,7 +79,25 @@ export function App() {
     try {
       await postJSON<{ ok: boolean }>("/api/auth/logout", {});
     } finally {
+      setMailboxFolders([]);
+      setArchiveFolders([]);
       setAuth({ authenticated: false });
+    }
+  }
+
+  async function loadMailboxFolders() {
+    if (!auth?.authenticated) {
+      setMailboxFolders([]);
+      return;
+    }
+    setMailboxFoldersLoading(true);
+    try {
+      const data = await getJSON<InboxFoldersResponse>("/api/inbox/folders");
+      setMailboxFolders(data.folders ?? []);
+    } catch {
+      setMailboxFolders([]);
+    } finally {
+      setMailboxFoldersLoading(false);
     }
   }
 
@@ -103,6 +116,14 @@ export function App() {
       setArchiveFoldersLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!auth?.authenticated) {
+      setMailboxFolders([]);
+      return;
+    }
+    void loadMailboxFolders();
+  }, [auth?.authenticated]);
 
   useEffect(() => {
     if (!archiveOpen) return;
@@ -148,6 +169,7 @@ export function App() {
   }
 
   function openComposeWindow() {
+    resetComposeForm();
     setComposeError("");
     setComposeSuccess("");
     setComposeOpen(true);
@@ -167,6 +189,18 @@ export function App() {
   function trashComposeDraft() {
     resetComposeForm();
     setComposeOpen(false);
+  }
+
+  function closeComposeWindow() {
+    setComposeOpen(false);
+    resetComposeForm();
+  }
+
+  function mailboxLabel(path: string): string {
+    const clean = path.trim();
+    if (!clean) return "";
+    const parts = clean.replace(/^INBOX[/.]/i, "").split(/[/.]/).filter(Boolean);
+    return parts[parts.length - 1] ?? clean;
   }
 
   async function sendComposeEmail() {
@@ -257,17 +291,17 @@ export function App() {
           New Email
         </button>
         <nav>
-          {primaryNavItems.map(([to, label]) => (
-            <Link key={to} to={to}>
-              {label}
-            </Link>
-          ))}
-
-          {mailboxNavItems.map(([to, label]) => (
-            <Link key={to} to={to}>
-              {label}
-            </Link>
-          ))}
+          <Link to="/read">Inbox</Link>
+          <div className="nav-group">
+            {mailboxFoldersLoading ? <span>Loading folders...</span> : null}
+            {!mailboxFoldersLoading
+              ? mailboxFolders.map((folder) => (
+                  <Link key={folder} to={`/read?mailbox=${encodeURIComponent(folder)}`}>
+                    {mailboxLabel(folder)}
+                  </Link>
+                ))
+              : null}
+          </div>
 
           <button
             type="button"
@@ -283,14 +317,11 @@ export function App() {
               {archiveFoldersLoading ? <span>Loading folders...</span> : null}
               {!archiveFoldersLoading && archiveFolders.length === 0 ? <span>No archive folders</span> : null}
               {!archiveFoldersLoading
-                ? archiveFolders.map((folder) => {
-                    const mailboxPath = `Archive/${folder}`;
-                    return (
-                      <Link key={mailboxPath} to={`/read?mailbox=${encodeURIComponent(mailboxPath)}`}>
-                        {folder}
-                      </Link>
-                    );
-                  })
+                ? archiveFolders.map((folder) => (
+                    <Link key={folder} to={`/read?mailbox=${encodeURIComponent(folder)}`}>
+                      {mailboxLabel(folder)}
+                    </Link>
+                  ))
                 : null}
             </div>
           ) : null}
@@ -329,6 +360,7 @@ export function App() {
           <Route path="/login" element={<LoginPage auth={auth} onAuthChanged={refreshAuth} />} />
               <Route path="/read" element={protect(<ReadPage onOpenDraft={openDraftInCompose} />)} />
           <Route path="/status" element={protect(<StatusPage />)} />
+          <Route path="/health" element={protect(<HealthPage />)} />
           <Route path="/config" element={protect(<ConfigPage />)} />
           <Route path="/tuning" element={protect(<TuningPage />)} />
           <Route path="/labels" element={protect(<LabelsPage />)} />
@@ -337,7 +369,7 @@ export function App() {
         </Routes>
       </main>
       {composeOpen ? (
-        <div className="compose-backdrop" role="dialog" aria-modal="true" onClick={() => setComposeOpen(false)}>
+        <div className="compose-backdrop" role="dialog" aria-modal="true" onClick={closeComposeWindow}>
           <section className="compose-window" onClick={(event) => event.stopPropagation()}>
             <div className="compose-topbar">
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -345,7 +377,7 @@ export function App() {
                 <button type="button" className="compose-save-draft" onClick={() => void saveComposeDraft()} disabled={composeSending || composeSavingDraft}>Save Draft</button>
                 <button type="button" className="compose-trash" onClick={trashComposeDraft} disabled={composeSending || composeSavingDraft}>Trash</button>
               </div>
-              <button type="button" className="compose-close" onClick={() => setComposeOpen(false)} disabled={composeSending || composeSavingDraft}>Close</button>
+              <button type="button" className="compose-close" onClick={closeComposeWindow} disabled={composeSending || composeSavingDraft}>Close</button>
             </div>
 
             {composeError ? <p className="notice notice-error" style={{ margin: 0 }}>Send failed: {composeError}</p> : null}

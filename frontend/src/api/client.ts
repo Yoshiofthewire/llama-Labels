@@ -28,9 +28,7 @@ export async function getJSON<T>(path: string): Promise<T> {
 export async function putJSON<T>(path: string, body: unknown): Promise<T> {
   return requestJSON<T>(path, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 }
@@ -38,22 +36,15 @@ export async function putJSON<T>(path: string, body: unknown): Promise<T> {
 export async function postJSON<T>(path: string, body: unknown): Promise<T> {
   return requestJSON<T>(path, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 }
 
 export async function postFormData<T>(path: string, body: FormData): Promise<T> {
-  return requestJSON<T>(path, {
-    method: "POST",
-    body
-  });
+  return requestJSON<T>(path, { method: "POST", body });
 }
 
 export async function deleteJSON<T>(path: string): Promise<T> {
-  return requestJSON<T>(path, {
-    method: "DELETE"
-  });
+  return requestJSON<T>(path, { method: "DELETE" });
 }

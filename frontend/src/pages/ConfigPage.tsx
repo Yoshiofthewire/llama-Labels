@@ -36,61 +36,49 @@ type IMAPForm = {
 };
 
 function normalizeKeywordMappings(input: unknown): Record<string, string[]> {
-  if (!input || typeof input !== "object") {
-    return {};
-  }
+  if (!input || typeof input !== "object") return {};
   const source = input as Record<string, unknown>;
   const out: Record<string, string[]> = {};
+  
   for (const [label, rawValues] of Object.entries(source)) {
     const cleanLabel = String(label).trim();
-    if (!cleanLabel) {
-      continue;
-    }
-    if (Array.isArray(rawValues)) {
-      const values = uniqueLabels(rawValues.map((item) => String(item)));
-      if (values.length > 0) {
-        out[cleanLabel] = values;
-      }
-      continue;
-    }
-    if (typeof rawValues === "string") {
-      const values = uniqueLabels(rawValues.split(","));
-      if (values.length > 0) {
-        out[cleanLabel] = values;
-      }
-    }
+    if (!cleanLabel) continue;
+    
+    const values = Array.isArray(rawValues)
+      ? uniqueLabels(rawValues.map(String))
+      : typeof rawValues === "string"
+        ? uniqueLabels(rawValues.split(","))
+        : [];
+    
+    if (values.length > 0) out[cleanLabel] = values;
   }
   return out;
 }
 
 function normalizeConfig(input: unknown): AppConfig {
   const source = (input ?? {}) as Record<string, any>;
-  const labels = (source.labels ?? source.Labels ?? {}) as Record<string, any>;
-  const llama = (source.llama ?? source.Llama ?? {}) as Record<string, any>;
-  const scan = (source.scan ?? source.Scan ?? {}) as Record<string, any>;
-  const rateLimits = (source.rateLimits ?? source.RateLimits ?? {}) as Record<string, any>;
-
-  const rawMappings =
-    labels.keywordMappings ?? labels.KeywordMappings ?? labels.keyword_mappings ?? source.keywordMappings ?? source.KeywordMappings;
+  const labels = source.labels ?? {};
+  const llama = source.llama ?? {};
+  const scan = source.scan ?? {};
+  const rateLimits = source.rateLimits ?? {};
+  const rawMappings = labels.keywordMappings;
 
   return {
-    timezone: source.timezone ?? source.Timezone ?? "UTC",
-    logLevel: source.logLevel ?? source.LogLevel ?? "info",
-    scan: {
-      intervalSeconds: scan.intervalSeconds ?? scan.IntervalSeconds ?? 90
-    },
+    timezone: source.timezone ?? "UTC",
+    logLevel: source.logLevel ?? "info",
+    scan: { intervalSeconds: scan.intervalSeconds ?? 90 },
     rateLimits: {
-      perMinute: rateLimits.perMinute ?? rateLimits.PerMinute ?? 10,
-      perHour: rateLimits.perHour ?? rateLimits.PerHour ?? 20
+      perMinute: rateLimits.perMinute ?? 10,
+      perHour: rateLimits.perHour ?? 20
     },
     labels: {
-      allowlist: labels.allowlist ?? labels.Allowlist ?? [],
+      allowlist: labels.allowlist ?? [],
       keywordMappings: normalizeKeywordMappings(rawMappings)
     },
     llama: {
-      baseUrl: llama.baseUrl ?? llama.BaseURL ?? "",
-      apiKey: llama.apiKey ?? llama.APIKey ?? "",
-      classifyPath: llama.classifyPath ?? llama.ClassifyPath ?? "/"
+      baseUrl: llama.baseUrl ?? "",
+      apiKey: llama.apiKey ?? "",
+      classifyPath: llama.classifyPath ?? "/"
     }
   };
 }

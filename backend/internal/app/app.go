@@ -141,6 +141,18 @@ func envOrDefault(key, fallback string) string {
 	return fallback
 }
 
+func envDurationSeconds(name string, fallback int) int {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	return v
+}
+
 func monitorHealth(logger *logging.Logger, healthSvc *health.Service) {
 	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
@@ -157,18 +169,6 @@ func monitorHealth(logger *logging.Logger, healthSvc *health.Service) {
 		_ = syscall.Kill(1, syscall.SIGTERM)
 		os.Exit(2)
 	}
-}
-
-func envDurationSeconds(name string, fallback int) int {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback
-	}
-	v, err := strconv.Atoi(raw)
-	if err != nil || v <= 0 {
-		return fallback
-	}
-	return v
 }
 
 func newLlamaClient(cfg config.Config) llama.Client {
