@@ -9,11 +9,14 @@ type AppConfig = {
   labels: { allowlist: string[]; keywordMappings: Record<string, string[]> };
   llama: { baseUrl: string; apiKey: string; classifyPath: string };
   notifications: {
-    mode: "all" | "folder" | "none";
-    folder: string;
-    publicKey: string;
-    privateKeyPath: string;
+    mode: "all" | "keywords" | "none";
+    keywords: string[];
   };
+};
+
+type LabelsResponse = {
+  configured: string[];
+  imap: string[];
 };
 
 function normalizeConfig(input: unknown): AppConfig {
@@ -39,16 +42,14 @@ function normalizeConfig(input: unknown): AppConfig {
     },
     notifications: {
       mode: notifications.mode ?? "none",
-      folder: notifications.folder ?? "",
-      publicKey: notifications.publicKey ?? "",
-      privateKeyPath: notifications.privateKeyPath ?? ""
+      keywords: Array.isArray(notifications.keywords) ? notifications.keywords.map(String) : []
     }
   };
 }
 
 export function NotificationsPage() {
   const [cfg, setCfg] = useState<AppConfig | null>(null);
-  const [folderName, setFolderName] = useState("");
+  const [availableKeywords, setAvailableKeywords] = useState<string[]>([]);
   const [status, setStatus] = useState("");
 
   useEffect(() => {
@@ -56,13 +57,16 @@ export function NotificationsPage() {
 
     async function load() {
       try {
-        const nextConfig = await getJSON<unknown>("/api/config");
+        const [nextConfig, labelsData] = await Promise.all([
+          getJSON<unknown>("/api/config"),
+          getJSON<LabelsResponse>("/api/labels")
+        ]);
         if (cancelled) {
           return;
         }
         const normalized = normalizeConfig(nextConfig);
         setCfg(normalized);
-        setFolderName(normalized.notifications.folder);
+        setAvailableKeywords(uniqueLabels(labelsData.imap ?? []));
       } catch {
         if (!cancelled) {
           setStatus("Failed to load notification settings.");
@@ -85,7 +89,7 @@ export function NotificationsPage() {
       ...cfg,
       notifications: {
         ...cfg.notifications,
-        folder: folderName.trim()
+        keywords: uniqueLabels(cfg.notifications.keywords)
       }
     };
 
@@ -110,36 +114,66 @@ export function NotificationsPage() {
   return (
     <section className="panel">
       <h2>Notifications</h2>
-      <p>Configure browser push notification preferences and the generated push key material.</p>
+      <p>Configure browser push notification preferences.</p>
 
-      <label>
+      <div>
         <div>Notification Mode</div>
-        <select
-          value={cfg.notifications.mode}
-          onChange={(event) => setCfg((prev) => (prev ? { ...prev, notifications: { ...prev.notifications, mode: event.target.value as AppConfig["notifications"]["mode"] } } : prev))}
-        >
-          <option value="none">No email</option>
-          <option value="all">All email</option>
-          <option value="folder">Only emails in a folder</option>
-        </select>
-      </label>
-
-      {cfg.notifications.mode === "folder" ? (
         <label>
-          <div>Folder</div>
-          <input value={folderName} onChange={(event) => setFolderName(event.target.value)} placeholder="INBOX/Alerts" />
+          <input
+            type="radio"
+            checked={cfg.notifications.mode === "none"}
+            onChange={() => setCfg((prev) => (prev ? { ...prev, notifications: { ...prev.notifications, mode: "none" } } : prev))}
+          />
+          No email
         </label>
+        <label>
+          <input
+            type="radio"
+            checked={cfg.notifications.mode === "all"}
+            onChange={() => setCfg((prev) => (prev ? { ...prev, notifications: { ...prev.notifications, mode: "all", keywords: [] } } : prev))}
+          />
+          All emails
+        </label>
+        <label>
+          <input
+            type="radio"
+            checked={cfg.notifications.mode === "keywords"}
+            onChange={() => setCfg((prev) => (prev ? { ...prev, notifications: { ...prev.notifications, mode: "keywords" } } : prev))}
+          />
+          IMAP keywords
+        </label>
+      </div>
+
+      {cfg.notifications.mode === "keywords" ? (
+        <div>
+          <div>IMAP Keywords</div>
+          <button
+            type="button"
+            onClick={() => setCfg((prev) => (prev ? { ...prev, notifications: { ...prev.notifications, keywords: uniqueLabels(availableKeywords) } } : prev))}
+          >
+            Select All
+          </button>
+          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+            {availableKeywords.length === 0 ? <p>No IMAP keywords found.</p> : null}
+            {availableKeywords.map((keyword) => (
+              <label key={keyword}>
+                <input
+                  type="checkbox"
+                  checked={cfg.notifications.keywords.includes(keyword)}
+                  onChange={(event) => setCfg((prev) => {
+                    if (!prev) return prev;
+                    const nextKeywords = event.target.checked
+                      ? uniqueLabels([...prev.notifications.keywords, keyword])
+                      : prev.notifications.keywords.filter((item) => item !== keyword);
+                    return { ...prev, notifications: { ...prev.notifications, keywords: nextKeywords } };
+                  })}
+                />
+                {keyword}
+              </label>
+            ))}
+          </div>
+        </div>
       ) : null}
-
-      <label>
-        <div>Push Public Key</div>
-        <textarea readOnly value={cfg.notifications.publicKey} rows={4} />
-      </label>
-
-      <label>
-        <div>Private Key File</div>
-        <input readOnly value={cfg.notifications.privateKeyPath} />
-      </label>
 
       <button type="button" onClick={() => void save()}>Save Notifications</button>
       {status ? <p>{status}</p> : null}

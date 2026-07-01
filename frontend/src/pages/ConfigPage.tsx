@@ -10,10 +10,8 @@ type AppConfig = {
   labels: { allowlist: string[]; keywordMappings: Record<string, string[]> };
   llama: { baseUrl: string; apiKey: string; classifyPath: string };
   notifications: {
-    mode: "all" | "folder" | "none";
-    folder: string;
-    publicKey: string;
-    privateKeyPath: string;
+    mode: "all" | "keywords" | "none";
+    keywords: string[];
   };
 };
 
@@ -93,9 +91,7 @@ function normalizeConfig(input: unknown): AppConfig {
     },
     notifications: {
       mode: source.notifications?.mode ?? "none",
-      folder: source.notifications?.folder ?? "",
-      publicKey: source.notifications?.publicKey ?? "",
-      privateKeyPath: source.notifications?.privateKeyPath ?? ""
+      keywords: Array.isArray(source.notifications?.keywords) ? source.notifications.keywords.map(String) : []
     }
   };
 }

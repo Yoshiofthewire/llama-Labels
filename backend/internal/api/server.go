@@ -725,7 +725,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.mu.RLock()
-		cfg := s.cfg
+		cfg := sanitizeConfigForClient(s.cfg)
 		s.mu.RUnlock()
 		writeJSON(w, http.StatusOK, cfg)
 	case http.MethodPut:
@@ -734,6 +734,10 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid config payload", http.StatusBadRequest)
 			return
 		}
+		s.mu.RLock()
+		next.Notifications.PublicKey = s.cfg.Notifications.PublicKey
+		next.Notifications.PrivateKeyPath = s.cfg.Notifications.PrivateKeyPath
+		s.mu.RUnlock()
 		if err := config.Save(s.configPath, next); err != nil {
 			http.Error(w, "failed to save config", http.StatusInternalServerError)
 			return
@@ -749,6 +753,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func sanitizeConfigForClient(cfg config.Config) config.Config {
+	cfg.Notifications.PublicKey = ""
+	cfg.Notifications.PrivateKeyPath = ""
+	return cfg
 }
 
 func (s *Server) handleDecisions(w http.ResponseWriter, r *http.Request) {

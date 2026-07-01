@@ -53,10 +53,10 @@ type Config struct {
 }
 
 type NotificationSettings struct {
-	Mode           string `yaml:"mode" json:"mode"`
-	Folder         string `yaml:"folder" json:"folder"`
-	PublicKey      string `yaml:"publicKey" json:"publicKey"`
-	PrivateKeyPath string `yaml:"privateKeyPath" json:"privateKeyPath"`
+	Mode           string   `yaml:"mode" json:"mode"`
+	Keywords       []string `yaml:"keywords" json:"keywords"`
+	PublicKey      string   `yaml:"publicKey" json:"-"`
+	PrivateKeyPath string   `yaml:"privateKeyPath" json:"-"`
 }
 
 type Pattern struct {
@@ -85,6 +85,7 @@ func Default() Config {
 	}
 	cfg.Labels.KeywordMappings = map[string][]string{}
 	cfg.Notifications.Mode = "none"
+	cfg.Notifications.Keywords = []string{}
 	return cfg
 }
 
