@@ -426,28 +426,6 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", justifyContent: "center", marginTop: 14, paddingTop: 10 }}>
-        <button
-          type="button"
-          onClick={loadInbox}
-          disabled={loading || actionLoading}
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--ink-strong)",
-            font: "inherit",
-            fontSize: "0.85rem",
-            opacity: 0.75,
-            padding: 0,
-            cursor: loading || actionLoading ? "default" : "pointer"
-          }}
-          aria-label="Refresh inbox"
-          title="Refresh inbox"
-        >
-          {updatedLabel}
-        </button>
-      </div>
-
       {sortedRows.length === 0 ? (
         <p style={{ opacity: 0.75 }}>{isInboxMailbox ? "No emails in this tab yet." : "No emails yet."}</p>
       ) : (
@@ -546,6 +524,19 @@ export function ReadPage({ onOpenDraft }: ReadPageProps) {
           </table>
         </div>
       )}
+
+      <div className="inbox-updated-footer">
+        <button
+          type="button"
+          onClick={loadInbox}
+          disabled={loading || actionLoading}
+          className="inbox-updated-button"
+          aria-label="Refresh inbox"
+          title="Refresh inbox"
+        >
+          {updatedLabel}
+        </button>
+      </div>
 
       {selected ? (
         <div

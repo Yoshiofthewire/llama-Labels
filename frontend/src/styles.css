@@ -613,6 +613,28 @@ pre {
   fill: var(--accent);
 }
 
+.inbox-updated-footer {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.inbox-updated-button {
+  border: 0;
+  background: transparent;
+  color: var(--ink-strong);
+  font: inherit;
+  font-size: 0.85rem;
+  opacity: 0.75;
+  padding: 0;
+  cursor: pointer;
+}
+
+.inbox-updated-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;
