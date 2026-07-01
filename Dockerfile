@@ -5,7 +5,7 @@ RUN cd backend && go mod download
 COPY backend ./backend
 RUN cd backend && go build -o /app/bin/llama-lab ./cmd/main.go
 
-FROM node:20-alpine AS frontend-builder
+FROM node:26.3.0-slim AS frontend-builder
 WORKDIR /frontend
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
