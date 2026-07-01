@@ -160,6 +160,8 @@ export function ConfigPage() {
 
   const [llamaTestBusy, setLlamaTestBusy] = useState(false);
   const [llamaTestResult, setLlamaTestResult] = useState("");
+  const [activeTab, setActiveTab] = useState<"application" | "email" | "labels" | "llm">("application");
+  const configStatusTone = configStatus.toLowerCase().includes("failed") ? "notice notice-error" : "notice notice-success";
 
   const effectiveAllowlist = useMemo(() => {
     const cfgLabels = textToLabels(allowlistText);
@@ -342,179 +344,219 @@ export function ConfigPage() {
   }
 
   return (
-    <section className="panel">
-      <h2>Configuration</h2>
-      <p>Manage app settings, IMAP credentials, labels, and Llama connectivity.</p>
-
-      <hr />
-      <h3>Application</h3>
-      <label>
-        <div>Timezone</div>
-        <input value={cfg.timezone} onChange={(event) => updateConfig("timezone", event.target.value)} />
-      </label>
-      <label>
-        <div>Log Level</div>
-        <input value={cfg.logLevel} onChange={(event) => updateConfig("logLevel", event.target.value)} />
-      </label>
-      <label>
-        <div>Scan Interval (seconds)</div>
-        <input
-          type="number"
-          value={cfg.scan.intervalSeconds}
-          onChange={(event) => updateConfig("scan", { intervalSeconds: Number(event.target.value) || 0 })}
-        />
-      </label>
-      <label>
-        <div>Rate Limit Per Minute</div>
-        <input
-          type="number"
-          value={cfg.rateLimits.perMinute}
-          onChange={(event) => updateConfig("rateLimits", { ...cfg.rateLimits, perMinute: Number(event.target.value) || 0 })}
-        />
-      </label>
-      <label>
-        <div>Rate Limit Per Hour</div>
-        <input
-          type="number"
-          value={cfg.rateLimits.perHour}
-          onChange={(event) => updateConfig("rateLimits", { ...cfg.rateLimits, perHour: Number(event.target.value) || 0 })}
-        />
-      </label>
-      <label>
-        <div>Theme</div>
-        <select
-          value={selectedTheme}
-          onChange={(event) => setSelectedTheme(event.target.value as ThemeName)}
-        >
-          {THEME_OPTIONS.map((theme) => (
-            <option key={theme} value={theme}>
-              {theme}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="button" onClick={saveTheme}>Apply Theme</button>
-      <button type="button" onClick={saveConfig}>Save Configuration</button>
-
-      <hr />
-      <h3>IMAP</h3>
-      <p>Saved mail config is encrypted at rest. SMTP settings fall back to the IMAP-derived host when left blank.</p>
-      <label>
-        <div>Host</div>
-        <input value={imapForm.host} onChange={(event) => setImapForm((prev) => ({ ...prev, host: event.target.value }))} />
-      </label>
-      <label>
-        <div>Port</div>
-        <input
-          type="number"
-          value={imapForm.port}
-          onChange={(event) => setImapForm((prev) => ({ ...prev, port: Number(event.target.value) || 993 }))}
-        />
-      </label>
-      <label>
-        <div>Username</div>
-        <input value={imapForm.username} onChange={(event) => setImapForm((prev) => ({ ...prev, username: event.target.value }))} />
-      </label>
-      <label>
-        <div>Password or App Password</div>
-        <input
-          type="password"
-          value={imapForm.password}
-          onChange={(event) => setImapForm((prev) => ({ ...prev, password: event.target.value }))}
-          placeholder="Required when saving changes"
-        />
-      </label>
-      <label>
-        <div>Mailbox</div>
-        <input value={imapForm.mailbox} onChange={(event) => setImapForm((prev) => ({ ...prev, mailbox: event.target.value }))} />
-      </label>
-      <label>
-        <div>SMTP Host (optional)</div>
-        <input value={imapForm.smtpHost} onChange={(event) => setImapForm((prev) => ({ ...prev, smtpHost: event.target.value }))} placeholder="Defaults to IMAP-derived host" />
-      </label>
-      <label>
-        <div>SMTP Port (optional)</div>
-        <input
-          type="number"
-          value={imapForm.smtpPort}
-          onChange={(event) => setImapForm((prev) => ({ ...prev, smtpPort: Number(event.target.value) || 587 }))}
-        />
-      </label>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={saveIMAPConfig} disabled={imapBusy}>
-          {imapBusy ? "Saving..." : "Save IMAP Config"}
-        </button>
-        <button type="button" onClick={testIMAPConfig} disabled={imapBusy}>
-          {imapBusy ? "Testing..." : "Test IMAP"}
-        </button>
-        <button type="button" onClick={deleteIMAPConfig} disabled={imapBusy}>
-          Delete Stored IMAP Config
-        </button>
+    <section className="panel config-page">
+      <div className="config-header">
+        <h2>Configuration</h2>
+        <p>Manage system behavior, email connectivity, labels, and model integration.</p>
       </div>
-      {imapStatus ? (
-        <div style={{ border: "1px solid var(--line)", borderRadius: 6, padding: 10, marginTop: 10 }}>
-          <p>Configured: {imapStatus.configured ? "Yes" : "No"}</p>
-          {imapStatus.path ? <p>Config Path: {imapStatus.path}</p> : null}
-          {imapStatus.keyPath ? <p>Key Path: {imapStatus.keyPath}</p> : null}
-          {imapStatus.host ? <p>Host: {imapStatus.host}</p> : null}
-          {imapStatus.port ? <p>Port: {imapStatus.port}</p> : null}
-          {imapStatus.username ? <p>Username: {imapStatus.username}</p> : null}
-          {imapStatus.mailbox ? <p>Mailbox: {imapStatus.mailbox}</p> : null}
-          {imapStatus.smtpHost ? <p>SMTP Host: {imapStatus.smtpHost}</p> : null}
-          {imapStatus.smtpPort ? <p>SMTP Port: {imapStatus.smtpPort}</p> : null}
-          {imapStatus.updatedAt ? <p>Updated: {imapStatus.updatedAt}</p> : null}
+
+      <div className="config-tabs" role="tablist" aria-label="Configuration sections">
+        <button type="button" role="tab" aria-selected={activeTab === "application"} className={`config-tab${activeTab === "application" ? " active" : ""}`} onClick={() => setActiveTab("application")}>Application</button>
+        <button type="button" role="tab" aria-selected={activeTab === "email"} className={`config-tab${activeTab === "email" ? " active" : ""}`} onClick={() => setActiveTab("email")}>Email Settings</button>
+        <button type="button" role="tab" aria-selected={activeTab === "labels"} className={`config-tab${activeTab === "labels" ? " active" : ""}`} onClick={() => setActiveTab("labels")}>Labels</button>
+        <button type="button" role="tab" aria-selected={activeTab === "llm"} className={`config-tab${activeTab === "llm" ? " active" : ""}`} onClick={() => setActiveTab("llm")}>Remote LLM</button>
+      </div>
+
+      {activeTab === "application" ? (
+        <div className="config-card" role="tabpanel">
+          <h3>Application</h3>
+          <p className="config-muted">Core runtime and interface settings.</p>
+          <div className="config-grid config-grid-two">
+            <label>
+              <div>Timezone</div>
+              <input value={cfg.timezone} onChange={(event) => updateConfig("timezone", event.target.value)} />
+            </label>
+            <label>
+              <div>Log Level</div>
+              <input value={cfg.logLevel} onChange={(event) => updateConfig("logLevel", event.target.value)} />
+            </label>
+            <label>
+              <div>Scan Interval (seconds)</div>
+              <input
+                type="number"
+                value={cfg.scan.intervalSeconds}
+                onChange={(event) => updateConfig("scan", { intervalSeconds: Number(event.target.value) || 0 })}
+              />
+            </label>
+            <label>
+              <div>Rate Limit Per Minute</div>
+              <input
+                type="number"
+                value={cfg.rateLimits.perMinute}
+                onChange={(event) => updateConfig("rateLimits", { ...cfg.rateLimits, perMinute: Number(event.target.value) || 0 })}
+              />
+            </label>
+            <label>
+              <div>Rate Limit Per Hour</div>
+              <input
+                type="number"
+                value={cfg.rateLimits.perHour}
+                onChange={(event) => updateConfig("rateLimits", { ...cfg.rateLimits, perHour: Number(event.target.value) || 0 })}
+              />
+            </label>
+            <label>
+              <div>Theme</div>
+              <select value={selectedTheme} onChange={(event) => setSelectedTheme(event.target.value as ThemeName)}>
+                {THEME_OPTIONS.map((theme) => (
+                  <option key={theme} value={theme}>
+                    {theme}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="config-actions">
+            <button type="button" onClick={saveTheme}>Apply Theme</button>
+            <button type="button" onClick={saveConfig}>Save Configuration</button>
+          </div>
         </div>
       ) : null}
-      {imapMessage ? <p>{imapMessage}</p> : null}
 
-      <hr />
-      <h3>Label Allowlist</h3>
-      <p>One label per line. These names must match mailbox keywords you want to apply.</p>
-      <label>
-        <div>Allowlist</div>
-        <textarea rows={10} value={allowlistText} onChange={(event) => setAllowlistText(event.target.value)} style={{ width: "100%" }} />
-      </label>
-      <label>
-        <div>Keyword Mappings (one per line: Label: Keyword1, Keyword2)</div>
-        <textarea
-          rows={8}
-          value={keywordMappingText}
-          onChange={(event) => setKeywordMappingText(event.target.value)}
-          style={{ width: "100%" }}
-        />
-      </label>
-      <button type="button" onClick={applyImapLabelsToAllowlist}>Merge IMAP Labels</button>
-      <button type="button" onClick={saveConfig}>Save Configuration</button>
-      {labelsFromImap.length > 0 ? <p>Discovered IMAP labels: {labelsFromImap.join(", ")}</p> : <p>No IMAP labels discovered yet.</p>}
+      {activeTab === "email" ? (
+        <div className="config-card" role="tabpanel">
+          <h3>Email Settings</h3>
+          <p className="config-muted">Stored mail credentials are encrypted at rest. SMTP host/port are optional overrides.</p>
+          <div className="config-grid config-grid-two">
+            <label>
+              <div>Host</div>
+              <input value={imapForm.host} onChange={(event) => setImapForm((prev) => ({ ...prev, host: event.target.value }))} />
+            </label>
+            <label>
+              <div>Port</div>
+              <input
+                type="number"
+                value={imapForm.port}
+                onChange={(event) => setImapForm((prev) => ({ ...prev, port: Number(event.target.value) || 993 }))}
+              />
+            </label>
+            <label>
+              <div>Username</div>
+              <input value={imapForm.username} onChange={(event) => setImapForm((prev) => ({ ...prev, username: event.target.value }))} />
+            </label>
+            <label>
+              <div>Password or App Password</div>
+              <input
+                type="password"
+                value={imapForm.password}
+                onChange={(event) => setImapForm((prev) => ({ ...prev, password: event.target.value }))}
+                placeholder="Required when saving changes"
+              />
+            </label>
+            <label>
+              <div>Mailbox</div>
+              <input value={imapForm.mailbox} onChange={(event) => setImapForm((prev) => ({ ...prev, mailbox: event.target.value }))} />
+            </label>
+            <label>
+              <div>SMTP Host (optional)</div>
+              <input
+                value={imapForm.smtpHost}
+                onChange={(event) => setImapForm((prev) => ({ ...prev, smtpHost: event.target.value }))}
+                placeholder="Defaults to IMAP-derived host"
+              />
+            </label>
+            <label>
+              <div>SMTP Port (optional)</div>
+              <input
+                type="number"
+                value={imapForm.smtpPort}
+                onChange={(event) => setImapForm((prev) => ({ ...prev, smtpPort: Number(event.target.value) || 587 }))}
+              />
+            </label>
+          </div>
+          <div className="config-actions">
+            <button type="button" onClick={saveIMAPConfig} disabled={imapBusy}>
+              {imapBusy ? "Saving..." : "Save Email Settings"}
+            </button>
+            <button type="button" onClick={testIMAPConfig} disabled={imapBusy}>
+              {imapBusy ? "Testing..." : "Test Email Settings"}
+            </button>
+            <button type="button" onClick={deleteIMAPConfig} disabled={imapBusy}>
+              Delete Stored Email Settings
+            </button>
+          </div>
 
-      {configStatus ? <p>{configStatus}</p> : null}
+          {imapStatus ? (
+            <div className="config-status-card">
+              <p>Configured: {imapStatus.configured ? "Yes" : "No"}</p>
+              {imapStatus.path ? <p>Config Path: {imapStatus.path}</p> : null}
+              {imapStatus.keyPath ? <p>Key Path: {imapStatus.keyPath}</p> : null}
+              {imapStatus.host ? <p>Host: {imapStatus.host}</p> : null}
+              {imapStatus.port ? <p>Port: {imapStatus.port}</p> : null}
+              {imapStatus.username ? <p>Username: {imapStatus.username}</p> : null}
+              {imapStatus.mailbox ? <p>Mailbox: {imapStatus.mailbox}</p> : null}
+              {imapStatus.smtpHost ? <p>SMTP Host: {imapStatus.smtpHost}</p> : null}
+              {imapStatus.smtpPort ? <p>SMTP Port: {imapStatus.smtpPort}</p> : null}
+              {imapStatus.updatedAt ? <p>Updated: {imapStatus.updatedAt}</p> : null}
+            </div>
+          ) : null}
 
-      <hr />
-      <h3>Remote LLM Model</h3>
-      <label>
-        <div>Base URL</div>
-        <input value={cfg.llama.baseUrl} onChange={(event) => updateConfig("llama", { ...cfg.llama, baseUrl: event.target.value })} />
-      </label>
-      <label>
-        <div>API Key</div>
-        <input
-          type="password"
-          value={cfg.llama.apiKey}
-          onChange={(event) => updateConfig("llama", { ...cfg.llama, apiKey: event.target.value })}
-        />
-      </label>
-      <label>
-        <div>Classify Path</div>
-        <input
-          value={cfg.llama.classifyPath}
-          onChange={(event) => updateConfig("llama", { ...cfg.llama, classifyPath: event.target.value })}
-        />
-      </label>
+          {imapMessage ? <p className="config-muted">{imapMessage}</p> : null}
+        </div>
+      ) : null}
 
-      <button type="button" onClick={runLlamaTest} disabled={llamaTestBusy}>
-        {llamaTestBusy ? "Testing..." : "Run Llama Test"}
-      </button>
-      {llamaTestResult ? <pre>{llamaTestResult}</pre> : null}
+      {activeTab === "labels" ? (
+        <div className="config-card" role="tabpanel">
+          <h3>Label Rules</h3>
+          <p className="config-muted">One label per line. Use keyword mappings to route alternate IMAP keywords.</p>
+          <div className="config-grid">
+            <label>
+              <div>Allowlist</div>
+              <textarea rows={10} value={allowlistText} onChange={(event) => setAllowlistText(event.target.value)} className="config-textarea" />
+            </label>
+            <label>
+              <div>Keyword Mappings (Label: Keyword1, Keyword2)</div>
+              <textarea
+                rows={8}
+                value={keywordMappingText}
+                onChange={(event) => setKeywordMappingText(event.target.value)}
+                className="config-textarea"
+              />
+            </label>
+          </div>
+          <div className="config-actions">
+            <button type="button" onClick={applyImapLabelsToAllowlist}>Merge IMAP Labels</button>
+            <button type="button" onClick={saveConfig}>Save Configuration</button>
+          </div>
+          <p className="config-muted">{labelsFromImap.length > 0 ? `Discovered IMAP labels: ${labelsFromImap.join(", ")}` : "No IMAP labels discovered yet."}</p>
+        </div>
+      ) : null}
+
+      {activeTab === "llm" ? (
+        <div className="config-card" role="tabpanel">
+          <h3>Remote LLM Model</h3>
+          <p className="config-muted">Connection settings for model classification calls.</p>
+          <div className="config-grid config-grid-two">
+            <label>
+              <div>Base URL</div>
+              <input value={cfg.llama.baseUrl} onChange={(event) => updateConfig("llama", { ...cfg.llama, baseUrl: event.target.value })} />
+            </label>
+            <label>
+              <div>Classify Path</div>
+              <input
+                value={cfg.llama.classifyPath}
+                onChange={(event) => updateConfig("llama", { ...cfg.llama, classifyPath: event.target.value })}
+              />
+            </label>
+            <label>
+              <div>API Key</div>
+              <input
+                type="password"
+                value={cfg.llama.apiKey}
+                onChange={(event) => updateConfig("llama", { ...cfg.llama, apiKey: event.target.value })}
+              />
+            </label>
+          </div>
+          <div className="config-actions">
+            <button type="button" onClick={saveConfig}>Save Configuration</button>
+            <button type="button" onClick={runLlamaTest} disabled={llamaTestBusy}>
+              {llamaTestBusy ? "Testing..." : "Run Llama Test"}
+            </button>
+          </div>
+          {llamaTestResult ? <pre className="config-pre">{llamaTestResult}</pre> : null}
+        </div>
+      ) : null}
+
+      {configStatus ? <p className={configStatusTone}>{configStatus}</p> : null}
     </section>
   );
 }

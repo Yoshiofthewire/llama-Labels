@@ -15,11 +15,11 @@ import { TuningPage } from "./pages/TuningPage";
 
 const settingsNavItems = [
   ["/login", "Login"],
-  ["/health", "Health"],
-  ["/config", "Config"],
+  ["/health", "System Health"],
+  ["/config", "Configuration"],
   ["/notifications", "Notifications"],
-  ["/tuning", "Tuning"],
-  ["/logs", "Logs"]
+  ["/tuning", "Prompt Tuning"],
+  ["/logs", "System Logs"]
 ] as const;
 
 type BeforeInstallPromptEvent = Event & {
@@ -117,6 +117,8 @@ export function App() {
   const [composeSuccess, setComposeSuccess] = useState("");
   const quillEditorRef = useRef<HTMLDivElement | null>(null);
   const quillInstanceRef = useRef<Quill | null>(null);
+  const currentMailbox = new URLSearchParams(location.search).get("mailbox")?.trim() ?? "";
+  const onReadPage = location.pathname === "/read";
 
   async function refreshAuth() {
     try {
@@ -530,12 +532,13 @@ export function App() {
           New Email
         </button>
         <nav>
+          <p className="sidebar-section-label">Mailboxes</p>
           <div className="mobile-quick-nav" aria-label="Mobile mailboxes">
-            <Link to="/read">Inbox</Link>
-            <Link to="/read?mailbox=Drafts">Drafts</Link>
-            <Link to="/read?mailbox=Junk">Junk</Link>
-            <Link to="/read?mailbox=Sent">Sent</Link>
-            <Link to="/read?mailbox=Trash">Trash</Link>
+            <Link className={onReadPage && currentMailbox === "" ? "sidebar-link-active" : ""} to="/read">Inbox</Link>
+            <Link className={onReadPage && currentMailbox.toLowerCase() === "drafts" ? "sidebar-link-active" : ""} to="/read?mailbox=Drafts">Drafts</Link>
+            <Link className={onReadPage && currentMailbox.toLowerCase() === "junk" ? "sidebar-link-active" : ""} to="/read?mailbox=Junk">Junk</Link>
+            <Link className={onReadPage && currentMailbox.toLowerCase() === "sent" ? "sidebar-link-active" : ""} to="/read?mailbox=Sent">Sent</Link>
+            <Link className={onReadPage && currentMailbox.toLowerCase() === "trash" ? "sidebar-link-active" : ""} to="/read?mailbox=Trash">Trash</Link>
             <button
               type="button"
               className="mobile-settings-toggle"
@@ -543,13 +546,13 @@ export function App() {
               title="Settings"
               onClick={() => setSettingsOpen((open) => !open)}
             >
-              ⚙
+              Settings
             </button>
           </div>
           <div className="inbox-nav-row">
             <Link
               to="/read"
-              className={dragOverFolder === "INBOX" ? "drop-target-active" : ""}
+              className={[dragOverFolder === "INBOX" ? "drop-target-active" : "", onReadPage && currentMailbox === "" ? "sidebar-link-active" : ""].filter(Boolean).join(" ")}
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragOverFolder("INBOX");
@@ -602,7 +605,10 @@ export function App() {
                   <div key={folder.path} className="sidebar-folder-row" data-folder-kind={standardMailboxKey(folder.path)}>
                     <Link
                       to={`/read?mailbox=${encodeURIComponent(folder.path)}`}
-                      className={dragOverFolder === folder.path ? "drop-target-active" : ""}
+                      className={[
+                        dragOverFolder === folder.path ? "drop-target-active" : "",
+                        onReadPage && currentMailbox.toLowerCase() === folder.path.toLowerCase() ? "sidebar-link-active" : ""
+                      ].filter(Boolean).join(" ")}
                       onDragOver={(event) => {
                         event.preventDefault();
                         setDragOverFolder(folder.path);
@@ -668,7 +674,10 @@ export function App() {
                     <Link
                       key={folder.path}
                       to={`/read?mailbox=${encodeURIComponent(folder.path)}`}
-                      className={dragOverFolder === folder.path ? "drop-target-active" : ""}
+                      className={[
+                        dragOverFolder === folder.path ? "drop-target-active" : "",
+                        onReadPage && currentMailbox.toLowerCase() === folder.path.toLowerCase() ? "sidebar-link-active" : ""
+                      ].filter(Boolean).join(" ")}
                       onDragOver={(event) => {
                         event.preventDefault();
                         setDragOverFolder(folder.path);
@@ -691,13 +700,17 @@ export function App() {
             aria-expanded={settingsOpen}
             onClick={() => setSettingsOpen((open) => !open)}
           >
-            Settings {settingsOpen ? "-" : "+"}
+            Workspace {settingsOpen ? "-" : "+"}
           </button>
 
           {settingsOpen ? (
             <div className="nav-group">
               {settingsNavItems.map(([to, label]) => (
-                <Link key={to} to={to === "/login" && auth.authenticated ? "/password" : to}>
+                <Link
+                  key={to}
+                  className={(to === "/login" && auth.authenticated ? "/password" : to) === location.pathname ? "sidebar-link-active" : ""}
+                  to={to === "/login" && auth.authenticated ? "/password" : to}
+                >
                   {to === "/login" && auth.authenticated ? "Change Password" : label}
                 </Link>
               ))}
