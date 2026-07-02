@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -72,7 +73,7 @@ func Run(args []string) error {
 
 	switch *mode {
 	case "daemon":
-		return runDaemon(cfg, logger, store, healthSvc)
+		return runDaemon(cfg, paths.ConfigFile, logger, store, healthSvc)
 	case "server":
 		return runServer(cfg, logger, store, healthSvc)
 	case "all":
@@ -82,13 +83,14 @@ func Run(args []string) error {
 	}
 }
 
-func runDaemon(cfg config.Config, logger *logging.Logger, store *state.Store, healthSvc *health.Service) error {
+func runDaemon(cfg config.Config, configPath string, logger *logging.Logger, store *state.Store, healthSvc *health.Service) error {
 	llamaClient := newLlamaClient(cfg)
 	poller, err := processor.New(cfg, logger, store, healthSvc, newMailClient(), llamaClient)
 	if err != nil {
 		return err
 	}
 	warmupLlamaOnStartup(logger, llamaClient, poller)
+	go watchConfigForDaemon(configPath, cfg, poller, logger)
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	go poller.Run()
@@ -97,6 +99,26 @@ func runDaemon(cfg config.Config, logger *logging.Logger, store *state.Store, he
 	<-stop
 	poller.Stop()
 	return nil
+}
+
+func watchConfigForDaemon(configPath string, initial config.Config, poller interface{ UpdateConfig(config.Config) }, logger *logging.Logger) {
+	current := initial
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		next, err := config.Load(configPath)
+		if err != nil {
+			logger.Error("daemon config reload failed", "error", err.Error())
+			continue
+		}
+		if reflect.DeepEqual(current, next) {
+			continue
+		}
+		current = next
+		poller.UpdateConfig(next)
+		logger.Info("daemon config reloaded from disk")
+	}
 }
 
 func runServer(cfg config.Config, logger *logging.Logger, store *state.Store, healthSvc *health.Service) error {

@@ -16,6 +16,7 @@ All code under `backend/`. Produces the `llama-lab` binary consumed by the conta
 - Binary output: `llama-lab`, deployed to `/app/bin/llama-lab` in the container
 - HTTP API listens on `WEB_PORT` (default 5866)
 - Three runtime modes: `daemon` (poller only), `server` (API only), `all` (both)
+- In Docker `server` and `daemon` run as separate processes; daemon reloads `config.yaml` from disk periodically so API-saved notification/config updates propagate without restart
 - Secrets (IMAP password, Ollama auth) are encrypted at rest under `SECRET_DIR`
 - State is persisted as JSON under `STATE_DIR`: checkpoint (last processed IMAP UID), processed set, decisions log
 - Logs are structured JSON, written to stdout and a rotating file (16 MB max × 8 backups) under `LOG_DIR`
