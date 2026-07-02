@@ -13,12 +13,13 @@ import (
 )
 
 type Store struct {
-	mu            sync.Mutex
-	baseDir       string
-	checkpoint    string
-	processedSet  map[string]time.Time
-	decisions     []Decision
-	notifications []NotificationSubscription
+	mu                 sync.Mutex
+	baseDir            string
+	checkpoint         string
+	processedSet       map[string]time.Time
+	decisions          []Decision
+	notifications      []NotificationSubscription
+	notificationsDirty bool
 
 	aiCreditsExhausted   bool
 	aiCreditsExhaustedAt string
@@ -94,6 +95,7 @@ func (s *Store) applyStateFile(sf stateFile) {
 	s.aiCreditsExhausted = sf.AICreditsExhausted
 	s.aiCreditsExhaustedAt = sf.AICreditsExhaustedAt
 	s.notifications = append([]NotificationSubscription{}, sf.Notifications...)
+	s.notificationsDirty = false
 
 	processed := make(map[string]time.Time, len(sf.Processed))
 	for id, ts := range sf.Processed {
@@ -139,6 +141,7 @@ func (s *Store) refreshNotificationsFromDiskLocked() error {
 		return err
 	}
 	s.notifications = append([]NotificationSubscription{}, sf.Notifications...)
+	s.notificationsDirty = false
 	return nil
 }
 
@@ -232,6 +235,12 @@ func (s *Store) ProcessedSince(since time.Time) int {
 }
 
 func (s *Store) persistLocked() error {
+	if !s.notificationsDirty {
+		if err := s.refreshNotificationsFromDiskLocked(); err != nil {
+			return err
+		}
+	}
+
 	processed := make(map[string]string, len(s.processedSet))
 	for id, ts := range s.processedSet {
 		processed[id] = ts.Format(time.RFC3339)
@@ -249,6 +258,7 @@ func (s *Store) persistLocked() error {
 	if err := os.WriteFile(s.path(), b, 0o600); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
+	s.notificationsDirty = false
 	return nil
 }
 
@@ -270,10 +280,12 @@ func (s *Store) UpsertNotificationSubscription(sub NotificationSubscription) err
 	for i, existing := range s.notifications {
 		if existing.Endpoint == sub.Endpoint {
 			s.notifications[i] = sub
+			s.notificationsDirty = true
 			return s.persistLocked()
 		}
 	}
 	s.notifications = append(s.notifications, sub)
+	s.notificationsDirty = true
 	return s.persistLocked()
 }
 
@@ -288,6 +300,7 @@ func (s *Store) RemoveNotificationSubscription(endpoint string) (bool, error) {
 			continue
 		}
 		s.notifications = append(s.notifications[:i], s.notifications[i+1:]...)
+		s.notificationsDirty = true
 		if err := s.persistLocked(); err != nil {
 			return false, err
 		}
