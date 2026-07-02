@@ -881,6 +881,7 @@ pre {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .notifications-save {
@@ -1424,6 +1425,14 @@ pre {
     overflow: hidden;
   }
 
+  .health-page-panel,
+  .logs-page-panel {
+    height: 100%;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   .inbox-list-region {
     min-height: 0;
     flex: 1;
@@ -1592,6 +1601,14 @@ pre {
 
   .notifications-layout {
     gap: 10px;
+  }
+
+  .notifications-footer {
+    justify-content: stretch;
+  }
+
+  .notifications-footer button {
+    width: 100%;
   }
 
   .notifications-keywords-grid {

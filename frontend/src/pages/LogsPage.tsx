@@ -141,7 +141,7 @@ export function LogsPage() {
   }, []);
 
   return (
-    <section className="panel">
+    <section className="panel logs-page-panel">
       <h2 style={{ marginTop: 0 }}>Logs</h2>
 
       <div style={{ display: "flex", gap: 0, flexWrap: "wrap", borderBottom: "1px solid var(--line)", marginBottom: "1rem" }}>

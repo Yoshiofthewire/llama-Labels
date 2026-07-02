@@ -77,7 +77,7 @@ export function HealthPage() {
   }, [health?.aiCreditsExhaustedAt]);
 
   return (
-    <section className="panel">
+    <section className="panel health-page-panel">
       <div className="health-head">
         <h2>Health Dashboard</h2>
         <div className="health-controls">
