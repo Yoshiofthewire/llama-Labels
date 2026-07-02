@@ -162,6 +162,7 @@ func (p *Poller) tick() {
 			})
 			// Retire the message so it is not retried on the next tick.
 			_ = p.store.MarkProcessed(msg.ID)
+			p.maybeSendPushNotification(msg, "", nil)
 			continue
 		}
 		processedCount++
@@ -259,6 +260,7 @@ func (p *Poller) handleMessage(ctx context.Context, msg imapadapter.Message) err
 		if err := p.store.MarkProcessed(msg.ID); err != nil {
 			return err
 		}
+		p.maybeSendPushNotification(msg, "", nil)
 		return nil
 	}
 	keywords := keywordsForSelectedLabel(selected, cfg.Labels.KeywordMappings)

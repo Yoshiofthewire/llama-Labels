@@ -57,6 +57,13 @@ func TestShouldSendNotification(t *testing.T) {
 			keywords:      nil,
 			want:          true,
 		},
+		{
+			name:          "all mode sends even when uncategorized",
+			settings:      config.NotificationSettings{Mode: "all"},
+			selectedLabel: "",
+			keywords:      nil,
+			want:          true,
+		},
 	}
 
 	for _, tc := range tests {
